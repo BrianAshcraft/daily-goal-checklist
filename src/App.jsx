@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-
+import { getDocs, query, where } from 'firebase/firestore'; 
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { setDoc, doc, updateDoc } from 'firebase/firestore';
 
 
 function App() {
@@ -31,6 +32,22 @@ useEffect(() => {
   return () => unsubscribe();
 }, []);
 
+useEffect(() => {
+  if (!user) return;
+
+  const loadHabits = async () => {
+    try {
+      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+      const snapshot = await getDocs(q);
+      const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setHabits(loadedHabits);
+    } catch (err) {
+      console.error('Failed to load habits:', err);
+    }
+  };
+
+  loadHabits();
+}, [user]);
 
   const getThreshold = (level) => {
     let threshold = 100;
@@ -50,36 +67,56 @@ useEffect(() => {
 
   const past30Days = getPastDates(7);
 
-  const awardXp = (delta) => {
+
+
+  const awardXp = (amount) => {
     setProfile(prev => {
-      const newXp = prev.xp + delta;
-      let newLevel = 0;
-      while (newXp >= getThreshold(newLevel + 1)) newLevel++;
+      let newXp = prev.xp + amount;
+      let newLevel = prev.level;
+  
+      while (newXp >= getThreshold(newLevel + 1)) {
+        newLevel++;
+      }
+  
       return { xp: newXp, level: newLevel };
     });
   };
+  
 
   const toggleCalendarMark = (habitId, date, subId = null) => {
     setHabits(prev =>
       prev.map(h => {
         if (h.id !== habitId) return h;
+  
+        let updatedHabit = { ...h };
+  
         if (subId === null) {
           const checked = !!h.calendar?.[date];
           const updatedCalendar = { ...h.calendar, [date]: !checked };
           awardXp(!checked ? h.xpValue : -h.xpValue);
-          return { ...h, calendar: updatedCalendar };
+          updatedHabit.calendar = updatedCalendar;
+        } else {
+          const newSubGoals = h.subGoals.map(s => {
+            if (s.id !== subId) return s;
+            const checked = !!s.calendar?.[date];
+            const updatedCalendar = { ...s.calendar, [date]: !checked };
+            awardXp(!checked ? s.xpValue : -s.xpValue);
+            return { ...s, calendar: updatedCalendar };
+          });
+          updatedHabit.subGoals = newSubGoals;
         }
-        const newSubGoals = h.subGoals.map(s => {
-          if (s.id !== subId) return s;
-          const checked = !!s.calendar?.[date];
-          const updatedCalendar = { ...s.calendar, [date]: !checked };
-          awardXp(!checked ? s.xpValue : -s.xpValue);
-          return { ...s, calendar: updatedCalendar };
-        });
-        return { ...h, subGoals: newSubGoals };
+  
+        const habitRef = doc(db, 'habits', h.id.toString());
+        updateDoc(habitRef, updatedHabit).catch(err =>
+          console.error('Failed to save habit', err)
+        );
+  
+        return updatedHabit;
       })
     );
   };
+  
+
 
   const handleDelete = id => {
     setHabits(prev => prev.filter(h => h.id !== id));
@@ -111,11 +148,9 @@ useEffect(() => {
       values: {},
       subGoals: []
     };
-    
-    
   
     try {
-      await addDoc(collection(db, 'habits'), newHabit);
+      await setDoc(doc(db, 'habits', now.toString()), newHabit);
       setHabits(prev => [...prev, newHabit]);
     } catch (error) {
       console.error('Failed to save habit:', error);
@@ -124,22 +159,37 @@ useEffect(() => {
     setHabitInput('');
     setXpInput('');
   };
+
   
 
-  const addSubGoal = (e, parentId) => {
+  const addSubGoal = async (e, parentId) => {
     e.preventDefault();
     const name = subName.trim();
     const xpVal = parseInt(subXp, 10);
     if (!name || isNaN(xpVal)) return;
-    setHabits(prev => prev.map(h => {
-      if (h.id !== parentId) return h;
-      const newSub = { id: Date.now(), name, xpValue: xpVal, calendar: {} };
-      return { ...h, subGoals: [...h.subGoals, newSub] };
-    }));
+  
+    const newSub = { id: Date.now(), name, xpValue: xpVal, calendar: {} };
+  
+    setHabits(prev => {
+      const updated = prev.map(h => {
+        if (h.id !== parentId) return h;
+        return { ...h, subGoals: [...h.subGoals, newSub] };
+      });
+  
+      // Save to Firestore
+      const updatedHabit = updated.find(h => h.id === parentId);
+      updateDoc(doc(db, 'habits', parentId.toString()), updatedHabit).catch(err =>
+        console.error('Failed to update habit with new sub-goal:', err)
+      );
+  
+      return updated;
+    });
+  
     setAddingSubTo(null);
     setSubName('');
     setSubXp('');
   };
+  
 
   const editHabit = (id, field, value) => {
     setHabits(prev => prev.map(h => h.id === id ? { ...h, [field]: value } : h));
@@ -218,27 +268,45 @@ useEffect(() => {
                       <button onClick={() => {
                         const entry = prompt('Journal entry:', h.values?.[date] || '');
                         if (entry !== null) {
-                          setHabits(prev => prev.map(hh => hh.id === h.id ? {
-                            ...hh,
-                            values: { ...hh.values, [date]: entry }
-                          } : hh));
+                          const alreadyLogged = !!h.values?.[date];
+                          setHabits(prev => prev.map(hh => {
+                            if (hh.id !== h.id) return hh;
+                            const updated = {
+                              ...hh,
+                              values: { ...hh.values, [date]: entry }
+                            };
+                            if (!alreadyLogged && entry.trim() !== '') {
+                              awardXp(h.xpValue);
+                            }
+                            return updated;
+                          }));
                         }
                       }} style={{ width: '100%' }}>
                         {h.values?.[date] ? 'View Entry' : 'Add Entry'}
                       </button>
+                      
                     ) : h.inputType === 'numeric' ? (
                       <input
-                        type="number"
-                        value={h.values?.[date] || ''}
-                        onChange={e => {
-                          const value = e.target.value;
-                          setHabits(prev => prev.map(hh => hh.id === h.id ? {
-                            ...hh,
-                            values: { ...hh.values, [date]: value }
-                          } : hh));
-                        }}
-                        style={{ width: '4rem' }}
-                      />
+  type="number"
+  value={h.values?.[date] || ''}
+  onChange={e => {
+    const value = e.target.value;
+    const alreadyLogged = h.values?.[date];
+    setHabits(prev => prev.map(hh => {
+      if (hh.id !== h.id) return hh;
+      const updated = {
+        ...hh,
+        values: { ...hh.values, [date]: value }
+      };
+      if (!alreadyLogged && value !== '') {
+        awardXp(h.xpValue);
+      }
+      return updated;
+    }));
+  }}
+  style={{ width: '4rem' }}
+/>
+
                     ) : (
                       <input
                         type="checkbox"
