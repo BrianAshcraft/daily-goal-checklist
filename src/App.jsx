@@ -119,43 +119,79 @@ useEffect(() => {
     });
   };
   
+
+
+  const handleJournalEntry = async (habitId, date, currentValue, xpValue) => {
+    const entry = prompt('Journal entry:', currentValue || '');
+    if (entry === null) return;
+  
+    try {
+      const habitRef = doc(db, 'habits', habitId);
+      const snapshot = await getDoc(habitRef);
+      if (!snapshot.exists()) return;
+  
+      const habitData = snapshot.data();
+      const alreadyLogged = !!habitData.values?.[date];
+  
+      const updatedValues = { ...(habitData.values || {}), [date]: entry };
+  
+      await updateDoc(habitRef, { values: updatedValues });
+  
+      if (!alreadyLogged && entry.trim() !== '') {
+        awardXp(xpValue);
+      }
+  
+      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+      const refreshed = await getDocs(q);
+      const loaded = refreshed.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setHabits(loaded);
+    } catch (err) {
+      console.error('Failed to save journal entry:', err);
+    }
+  };
+  
   
 
   const toggleCalendarMark = async (habitId, date, subId = null) => {
-    const updatedHabits = habits.map(h => {
-      if (h.id !== habitId) return h;
+    try {
+      const habitRef = doc(db, 'habits', habitId);
+      const snapshot = await getDoc(habitRef);
+      if (!snapshot.exists()) return;
   
-      let updatedHabit = { ...h };
+      const habitData = snapshot.data();
   
       if (subId === null) {
-        const checked = !!h.calendar?.[date];
-        const updatedCalendar = { ...h.calendar, [date]: !checked };
-        updatedHabit.calendar = updatedCalendar;
+        // Top-level habit checkbox
+        const checked = !!habitData.calendar?.[date];
+        const updatedCalendar = { ...(habitData.calendar || {}), [date]: !checked };
   
-        // Apply XP
-        awardXp(!checked ? h.xpValue : -h.xpValue);
+        await updateDoc(habitRef, { calendar: updatedCalendar });
+  
+        awardXp(!checked ? habitData.xpValue : -habitData.xpValue);
       } else {
-        const newSubGoals = h.subGoals.map(s => {
-          if (s.id !== subId) return s;
-          const checked = !!s.calendar?.[date];
-          const updatedCalendar = { ...s.calendar, [date]: !checked };
-          awardXp(!checked ? s.xpValue : -s.xpValue);
-          return { ...s, calendar: updatedCalendar };
+        // Sub-goal checkbox
+        const subGoals = habitData.subGoals || [];
+        const updatedSubGoals = subGoals.map(sub => {
+          if (sub.id !== subId) return sub;
+          const checked = !!sub.calendar?.[date];
+          const updatedCalendar = { ...(sub.calendar || {}), [date]: !checked };
+          awardXp(!checked ? sub.xpValue : -sub.xpValue);
+          return { ...sub, calendar: updatedCalendar };
         });
-        updatedHabit.subGoals = newSubGoals;
+  
+        await updateDoc(habitRef, { subGoals: updatedSubGoals });
       }
   
-      // Save to Firestore
-      const habitRef = doc(db, 'habits', habitId.toString());
-      updateDoc(habitRef, updatedHabit).catch(err =>
-        console.error('Failed to update Firestore:', err)
-      );
-  
-      return updatedHabit;
-    });
-  
-    setHabits(updatedHabits);
+      // Reload habits from Firestore
+      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+      const refreshedSnapshot = await getDocs(q);
+      const loadedHabits = refreshedSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setHabits(loadedHabits);
+    } catch (err) {
+      console.error('Failed to toggle checkbox and update Firestore:', err);
+    }
   };
+  
   
 
 
@@ -169,14 +205,26 @@ useEffect(() => {
   };
   
 
-  const handleDeleteSub = (habitId, subId) => {
-    setHabits(prev =>
-      prev.map(h => {
-        if (h.id !== habitId) return h;
-        return { ...h, subGoals: h.subGoals.filter(s => s.id !== subId) };
-      })
-    );
+  const handleDeleteSub = async (habitId, subId) => {
+    try {
+      const habitRef = doc(db, 'habits', habitId);
+      const snapshot = await getDoc(habitRef);
+      if (!snapshot.exists()) return;
+  
+      const habitData = snapshot.data();
+      const updatedSubGoals = (habitData.subGoals || []).filter(s => s.id !== subId);
+  
+      await updateDoc(habitRef, { subGoals: updatedSubGoals });
+  
+      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+      const refreshed = await getDocs(q);
+      const loadedHabits = refreshed.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setHabits(loadedHabits);
+    } catch (err) {
+      console.error('Failed to delete sub-goal:', err);
+    }
   };
+  
 
   const addHabit = async (e) => {
     e.preventDefault();
@@ -244,10 +292,20 @@ useEffect(() => {
   };
   
 
-  const editHabit = (id, field, value) => {
-    setHabits(prev => prev.map(h => h.id === id ? { ...h, [field]: value } : h));
+  const editHabit = async (id, field, value) => {
+    try {
+      const habitRef = doc(db, 'habits', id);
+      await updateDoc(habitRef, { [field]: value });
+  
+      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+      const snapshot = await getDocs(q);
+      const loaded = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setHabits(loaded);
+    } catch (err) {
+      console.error('Failed to edit habit field:', err);
+    }
   };
-
+  
   return (
 
   <div style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '100%', overflowX: 'auto' }}>
@@ -318,25 +376,12 @@ useEffect(() => {
                 {past30Days.map(date => (
                   <td key={date} style={{ textAlign: 'center' }}>
                     {h.inputType === 'journal' ? (
-                      <button onClick={() => {
-                        const entry = prompt('Journal entry:', h.values?.[date] || '');
-                        if (entry !== null) {
-                          const alreadyLogged = !!h.values?.[date];
-                          setHabits(prev => prev.map(hh => {
-                            if (hh.id !== h.id) return hh;
-                            const updated = {
-                              ...hh,
-                              values: { ...hh.values, [date]: entry }
-                            };
-                            if (!alreadyLogged && entry.trim() !== '') {
-                              awardXp(h.xpValue);
-                            }
-                            return updated;
-                          }));
-                        }
-                      }} style={{ width: '100%' }}>
-                        {h.values?.[date] ? 'View Entry' : 'Add Entry'}
-                      </button>
+                      <button
+                      onClick={() => handleJournalEntry(h.id, date, h.values?.[date], h.xpValue)}
+                      style={{ width: '100%' }}
+                    >
+                      {h.values?.[date] ? 'View Entry' : 'Add Entry'}
+                    </button>
                       
                     ) : h.inputType === 'numeric' ? (
                       <input
