@@ -4,6 +4,10 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { setDoc, doc, updateDoc } from 'firebase/firestore';
+import { getDoc } from 'firebase/firestore';
+import { deleteDoc } from 'firebase/firestore';
+
+
 
 
 function App() {
@@ -23,6 +27,29 @@ function App() {
 const [email, setEmail] = useState('');
 const [password, setPassword] = useState('');
 
+
+
+useEffect(() => {
+  if (!user) return;
+
+  const loadProfile = async () => {
+    try {
+      const userRef = doc(db, 'profiles', user.uid);
+      const snapshot = await getDoc(userRef);
+      if (snapshot.exists()) {
+        setProfile(snapshot.data());
+      } else {
+        // Set a new profile if it doesn't exist
+        await setDoc(userRef, { xp: 0, level: 0 });
+        setProfile({ xp: 0, level: 0 });
+      }
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+    }
+  };
+
+  loadProfile();
+}, [user]);
 
 
 useEffect(() => {
@@ -78,49 +105,69 @@ useEffect(() => {
         newLevel++;
       }
   
-      return { xp: newXp, level: newLevel };
+      const updatedProfile = { xp: newXp, level: newLevel };
+  
+
+      if (user) {
+        const userRef = doc(db, 'profiles', user.uid);
+        setDoc(userRef, updatedProfile, { merge: true }).catch(err =>
+          console.error('Failed to save profile:', err)
+        );
+      }
+  
+      return updatedProfile;
     });
   };
   
+  
 
-  const toggleCalendarMark = (habitId, date, subId = null) => {
-    setHabits(prev =>
-      prev.map(h => {
-        if (h.id !== habitId) return h;
+  const toggleCalendarMark = async (habitId, date, subId = null) => {
+    const updatedHabits = habits.map(h => {
+      if (h.id !== habitId) return h;
   
-        let updatedHabit = { ...h };
+      let updatedHabit = { ...h };
   
-        if (subId === null) {
-          const checked = !!h.calendar?.[date];
-          const updatedCalendar = { ...h.calendar, [date]: !checked };
-          awardXp(!checked ? h.xpValue : -h.xpValue);
-          updatedHabit.calendar = updatedCalendar;
-        } else {
-          const newSubGoals = h.subGoals.map(s => {
-            if (s.id !== subId) return s;
-            const checked = !!s.calendar?.[date];
-            const updatedCalendar = { ...s.calendar, [date]: !checked };
-            awardXp(!checked ? s.xpValue : -s.xpValue);
-            return { ...s, calendar: updatedCalendar };
-          });
-          updatedHabit.subGoals = newSubGoals;
-        }
+      if (subId === null) {
+        const checked = !!h.calendar?.[date];
+        const updatedCalendar = { ...h.calendar, [date]: !checked };
+        updatedHabit.calendar = updatedCalendar;
   
-        const habitRef = doc(db, 'habits', h.id.toString());
-        updateDoc(habitRef, updatedHabit).catch(err =>
-          console.error('Failed to save habit', err)
-        );
+        // Apply XP
+        awardXp(!checked ? h.xpValue : -h.xpValue);
+      } else {
+        const newSubGoals = h.subGoals.map(s => {
+          if (s.id !== subId) return s;
+          const checked = !!s.calendar?.[date];
+          const updatedCalendar = { ...s.calendar, [date]: !checked };
+          awardXp(!checked ? s.xpValue : -s.xpValue);
+          return { ...s, calendar: updatedCalendar };
+        });
+        updatedHabit.subGoals = newSubGoals;
+      }
   
-        return updatedHabit;
-      })
-    );
+      // Save to Firestore
+      const habitRef = doc(db, 'habits', habitId.toString());
+      updateDoc(habitRef, updatedHabit).catch(err =>
+        console.error('Failed to update Firestore:', err)
+      );
+  
+      return updatedHabit;
+    });
+  
+    setHabits(updatedHabits);
   };
   
 
 
-  const handleDelete = id => {
-    setHabits(prev => prev.filter(h => h.id !== id));
+  const handleDelete = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'habits', id.toString()));
+      setHabits(prev => prev.filter(h => h.id !== id));
+    } catch (err) {
+      console.error('Failed to delete habit from Firestore:', err);
+    }
   };
+  
 
   const handleDeleteSub = (habitId, subId) => {
     setHabits(prev =>
@@ -133,13 +180,12 @@ useEffect(() => {
 
   const addHabit = async (e) => {
     e.preventDefault();
+  
     const name = habitInput.trim();
     const xpVal = parseInt(xpInput, 10);
     if (!name || isNaN(xpVal)) return;
   
-    const now = Date.now();
     const newHabit = {
-      id: now,
       userId: user.uid,
       inputType,
       name,
@@ -150,16 +196,23 @@ useEffect(() => {
     };
   
     try {
-      await setDoc(doc(db, 'habits', now.toString()), newHabit);
-      setHabits(prev => [...prev, newHabit]);
+      await addDoc(collection(db, 'habits'), newHabit);
+  
+      // Immediately reload all habits from Firestore to reflect the new one
+      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+      const snapshot = await getDocs(q);
+      const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setHabits(loadedHabits);
     } catch (error) {
       console.error('Failed to save habit:', error);
     }
   
+    // Clear inputs
     setHabitInput('');
     setXpInput('');
   };
-
+  
+    
   
 
   const addSubGoal = async (e, parentId) => {
@@ -289,23 +342,36 @@ useEffect(() => {
                       <input
   type="number"
   value={h.values?.[date] || ''}
-  onChange={e => {
+  onChange={async (e) => {
     const value = e.target.value;
-    const alreadyLogged = h.values?.[date];
-    setHabits(prev => prev.map(hh => {
-      if (hh.id !== h.id) return hh;
-      const updated = {
-        ...hh,
-        values: { ...hh.values, [date]: value }
-      };
+
+    try {
+      const habitRef = doc(db, 'habits', h.id);
+      const snapshot = await getDoc(habitRef);
+      if (!snapshot.exists()) return;
+
+      const habitData = snapshot.data();
+      const alreadyLogged = !!habitData.values?.[date];
+
+      const updatedValues = { ...(habitData.values || {}), [date]: value };
+
+      await updateDoc(habitRef, { values: updatedValues });
+
       if (!alreadyLogged && value !== '') {
         awardXp(h.xpValue);
       }
-      return updated;
-    }));
+
+      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+      const refreshedSnapshot = await getDocs(q);
+      const loadedHabits = refreshedSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setHabits(loadedHabits);
+    } catch (err) {
+      console.error('Failed to update numeric input:', err);
+    }
   }}
   style={{ width: '4rem' }}
 />
+
 
                     ) : (
                       <input
