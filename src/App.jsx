@@ -10,7 +10,10 @@ import { deleteDoc } from 'firebase/firestore';
 
 
 
+
 function App() {
+  const [editingHabitId, setEditingHabitId] = useState(null);
+const [folders, setFolders] = useState([]);
   const [habits, setHabits] = useState([]);
   const [habitInput, setHabitInput] = useState('');
   const [xpInput, setXpInput] = useState('');
@@ -20,12 +23,14 @@ function App() {
   const [subName, setSubName] = useState('');
   const [subXp, setSubXp] = useState('');
 
-
   const auth = getAuth();
 
   const [user, setUser] = useState(null);
-const [email, setEmail] = useState('');
-const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [folderInput, setFolderInput] = useState('');
+const [newFolderName, setNewFolderName] = useState('');
+const [activeFolder, setActiveFolder] = useState(null);
 
 
 
@@ -94,6 +99,25 @@ useEffect(() => {
 
   const past30Days = getPastDates(7);
 
+useEffect(() => {
+  if (!user) return;
+
+  const loadFolders = async () => {
+    try {
+      const q = query(collection(db, 'folders'), where('userId', '==', user.uid));
+      const snapshot = await getDocs(q);
+      const folderList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setFolders(folderList);
+    } catch (err) {
+      console.error('Failed to load folders:', err);
+    }
+  };
+
+  loadFolders();
+}, [user]);
 
 
   const awardXp = (amount) => {
@@ -336,6 +360,80 @@ useEffect(() => {
       </div>
     )}
 
+<div style={{ marginBottom: '1.5rem' }}>
+  <h3>Create Folder</h3>
+  <input
+    type="text"
+    placeholder="Folder name"
+    value={newFolderName}
+    onChange={(e) => setNewFolderName(e.target.value)}
+    style={{ padding: '0.5rem', marginRight: '0.5rem' }}
+  />
+  <button
+    onClick={async () => {
+      const name = newFolderName.trim();
+      if (!name || !user) return;
+
+      try {
+        await addDoc(collection(db, 'folders'), {
+          name,
+          userId: user.uid,
+        });
+
+        setNewFolderName('');
+        // (optional) trigger reload of folder list later
+      } catch (err) {
+        console.error('Failed to create folder:', err);
+      }
+    }}
+    style={{ padding: '0.5rem 1rem' }}
+  >
+    Add Folder
+  </button>
+</div>
+
+
+<div style={{ marginBottom: '1rem' }}>
+  <strong>Folders: </strong>
+  <button
+  onClick={() => setActiveFolder(null)}
+  style={{
+    marginRight: '0.5rem',
+    padding: '0.25rem 0.75rem',
+    backgroundColor: activeFolder === null ? '#003366' : '#336699',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontWeight: activeFolder === null ? 'bold' : 'normal',
+    cursor: 'pointer'
+  }}
+>
+  Uncategorized
+</button>
+
+
+  {folders.map(f => (
+  <button
+    key={f.id}
+    onClick={() => setActiveFolder(f.name)}
+    style={{
+      marginRight: '0.5rem',
+      padding: '0.25rem 0.75rem',
+      backgroundColor: activeFolder === f.name ? '#003366' : '#336699',
+      color: 'white',
+      border: 'none',
+      borderRadius: '4px',
+      fontWeight: activeFolder === f.name ? 'bold' : 'normal',
+      cursor: 'pointer'
+    }}
+  >
+    {f.name}
+  </button>
+))}
+
+</div>
+
+
       <h1>Habit Loop</h1>
 
       <div style={{ marginBottom: '1rem' }}>
@@ -343,16 +441,45 @@ useEffect(() => {
         <strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}
       </div>
 
-      <form onSubmit={addHabit} style={{ marginBottom: '1.5rem' }}>
-        <select onChange={e => setInputType(e.target.value)} style={{ padding: '0.5rem', marginRight: '0.5rem' }}>
-          <option value="checkbox">Checkbox</option>
-          <option value="numeric">Numeric</option>
-          <option value="journal">Journal</option>
-        </select>
-        <input type="text" placeholder="Habit name" value={habitInput} onChange={e => setHabitInput(e.target.value)} style={{ padding: '0.5rem', width: '40%' }} />
-        <input type="number" placeholder="XP value" value={xpInput} onChange={e => setXpInput(e.target.value)} style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }} />
-        <button style={{ padding: '0.5rem 1rem', marginLeft: '0.5rem' }}>Add Habit</button>
-      </form>
+     <form onSubmit={addHabit} style={{ marginBottom: '1.5rem' }}>
+  <select
+    onChange={e => setInputType(e.target.value)}
+    style={{ padding: '0.5rem', marginRight: '0.5rem' }}
+  >
+    <option value="checkbox">Checkbox</option>
+    <option value="numeric">Numeric</option>
+    <option value="journal">Journal</option>
+  </select>
+
+  <input
+    type="text"
+    placeholder="Habit name"
+    value={habitInput}
+    onChange={e => setHabitInput(e.target.value)}
+    style={{ padding: '0.5rem', width: '30%' }}
+  />
+
+  <input
+    type="number"
+    placeholder="XP value"
+    value={xpInput}
+    onChange={e => setXpInput(e.target.value)}
+    style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
+  />
+
+  <input
+    type="text"
+    placeholder="Folder"
+    value={folderInput}
+    onChange={e => setFolderInput(e.target.value)}
+    style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
+  />
+
+  <button style={{ padding: '0.5rem 1rem', marginLeft: '0.5rem' }}>
+    Add Habit
+  </button>
+</form>
+
 
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
@@ -366,7 +493,15 @@ useEffect(() => {
           </tr>
         </thead>
         <tbody>
-          {habits.map(h => (
+          {[...habits]
+  .filter(h => {
+    if (activeFolder === null) {
+      return !h.folder || h.folder === "Uncategorized";
+    }
+    return h.folder === activeFolder;
+  })
+  .map(h => (
+
             <React.Fragment key={h.id}>
               <tr>
                 <td style={{ padding: '0.5rem' }}>
@@ -427,10 +562,79 @@ useEffect(() => {
                     )}
                   </td>
                 ))}
-                <td>
-                  <button onClick={() => handleDelete(h.id)}>Delete</button>
-                  <button onClick={() => setAddingSubTo(h.id)} style={{ marginLeft: '0.5rem' }}>Add Sub-goal</button>
-                </td>
+                <td style={{ position: 'relative' }}>
+  {editingHabitId === h.id ? (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <button onClick={() => handleDelete(h.id)}>Delete</button>
+      <button onClick={() => setAddingSubTo(h.id)}>Add Sub-goal</button>
+      <div>
+        <label style={{ fontSize: '0.85rem' }}>Add to Folder:</label>
+        <select
+          onChange={async (e) => {
+            const folderName = e.target.value;
+            if (!folderName) return;
+
+            try {
+              const habitRef = doc(db, 'habits', h.id);
+              await updateDoc(habitRef, { folder: folderName });
+
+              const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+              const snapshot = await getDocs(q);
+              const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+              setHabits(loadedHabits);
+            } catch (err) {
+              console.error('Failed to update folder:', err);
+            }
+          }}
+          defaultValue=""
+          style={{ padding: '0.25rem', marginTop: '0.25rem', width: '100%' }}
+        >
+          <option value="" disabled>Select folder</option>
+          {folders.map(f => (
+            <option key={f.id} value={f.name}>{f.name}</option>
+          ))}
+        </select>
+      </div>
+        <button
+    onClick={async () => {
+      try {
+        const habitRef = doc(db, 'habits', h.id);
+        await updateDoc(habitRef, { folder: "Uncategorized" });
+
+        const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+        const snapshot = await getDocs(q);
+        const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        setHabits(loadedHabits);
+      } catch (err) {
+        console.error('Failed to remove folder:', err);
+      }
+    }}
+    style={{
+  marginTop: '0.25rem',
+  backgroundColor: '#336699',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  padding: '0.25rem 0.5rem',
+  cursor: 'pointer'
+}}
+
+  >
+    Remove from Folder
+  </button>
+
+      <button
+        onClick={() => setEditingHabitId(null)}
+        style={{ marginTop: '0.25rem' }}
+      >
+        Done
+      </button>
+    </div>
+  ) : (
+    <button onClick={() => setEditingHabitId(h.id)}>Edit</button>
+  )}
+</td>
+
               </tr>
               {h.subGoals.map(s => (
                 <tr key={s.id}>
