@@ -412,24 +412,71 @@ useEffect(() => {
 </button>
 
 
-  {folders.map(f => (
-  <button
-    key={f.id}
-    onClick={() => setActiveFolder(f.name)}
-    style={{
-      marginRight: '0.5rem',
-      padding: '0.25rem 0.75rem',
-      backgroundColor: activeFolder === f.name ? '#003366' : '#336699',
-      color: 'white',
-      border: 'none',
-      borderRadius: '4px',
-      fontWeight: activeFolder === f.name ? 'bold' : 'normal',
-      cursor: 'pointer'
-    }}
-  >
-    {f.name}
-  </button>
+{folders.map(f => (
+  <span key={f.id} style={{ marginRight: '0.5rem', display: 'inline-flex', alignItems: 'center' }}>
+    <button
+      onClick={() => setActiveFolder(f.name)}
+      style={{
+        padding: '0.25rem 0.75rem',
+        backgroundColor: activeFolder === f.name ? '#003366' : '#336699',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px 0 0 4px',
+        fontWeight: activeFolder === f.name ? 'bold' : 'normal',
+        cursor: 'pointer'
+      }}
+    >
+      {f.name}
+    </button>
+    <button
+      onClick={async () => {
+        if (!window.confirm(`Delete folder "${f.name}" and move all habits to Uncategorized?`)) return;
+
+        try {
+          // Step 1: Remove the folder from Firestore
+          await deleteDoc(doc(db, 'folders', f.id));
+
+          // Step 2: Query all habits in this folder
+          const q = query(collection(db, 'habits'), where('userId', '==', user.uid), where('folder', '==', f.name));
+          const snapshot = await getDocs(q);
+          const batchPromises = snapshot.docs.map(docSnap => {
+            const ref = doc(db, 'habits', docSnap.id);
+            return updateDoc(ref, { folder: 'Uncategorized' });
+          });
+
+          await Promise.all(batchPromises);
+
+          // Step 3: Reload everything
+          const habitSnapshot = await getDocs(query(collection(db, 'habits'), where('userId', '==', user.uid)));
+          const loadedHabits = habitSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+          setHabits(loadedHabits);
+
+          const folderSnapshot = await getDocs(query(collection(db, 'folders'), where('userId', '==', user.uid)));
+          const loadedFolders = folderSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+          setFolders(loadedFolders);
+
+          if (activeFolder === f.name) {
+            setActiveFolder(null);
+          }
+        } catch (err) {
+          console.error('Failed to delete folder and reassign habits:', err);
+        }
+      }}
+      style={{
+        padding: '0.25rem 0.5rem',
+        backgroundColor: '#993333',
+        color: 'white',
+        border: 'none',
+        borderRadius: '0 4px 4px 0',
+        cursor: 'pointer'
+      }}
+    >
+      X
+    </button>
+  </span>
 ))}
+
+
 
 </div>
 
