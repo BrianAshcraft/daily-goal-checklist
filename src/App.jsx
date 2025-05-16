@@ -23,7 +23,7 @@ const [folders, setFolders] = useState([]);
   const [subName, setSubName] = useState('');
   const [subXp, setSubXp] = useState('');
 
-  const auth = getAuth();
+  
 
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState('');
@@ -31,6 +31,21 @@ const [folders, setFolders] = useState([]);
   const [folderInput, setFolderInput] = useState('');
 const [newFolderName, setNewFolderName] = useState('');
 const [activeFolder, setActiveFolder] = useState(null);
+const [renamingHabitId, setRenamingHabitId] = useState(null);
+const [renamingHabitName, setRenamingHabitName] = useState('');
+const [showAddHabitForm, setShowAddHabitForm] = useState(false);
+const [showAddFolderForm, setShowAddFolderForm] = useState(false);
+const auth = getAuth();
+const loadHabits = async () => {
+  if (!user) return;
+  try {
+  await addDoc(collection(db, 'habits'), newHabit);
+  await loadHabits();
+} catch (error) {
+  console.error('Failed to save habit:', error);
+}
+
+};
 
 
 
@@ -66,20 +81,9 @@ useEffect(() => {
 
 useEffect(() => {
   if (!user) return;
-
-  const loadHabits = async () => {
-    try {
-      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
-      const snapshot = await getDocs(q);
-      const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setHabits(loadedHabits);
-    } catch (err) {
-      console.error('Failed to load habits:', err);
-    }
-  };
-
   loadHabits();
 }, [user]);
+
 
   const getThreshold = (level) => {
     let threshold = 100;
@@ -360,37 +364,13 @@ useEffect(() => {
       </div>
     )}
 
-<div style={{ marginBottom: '1.5rem' }}>
-  <h3>Create Folder</h3>
-  <input
-    type="text"
-    placeholder="Folder name"
-    value={newFolderName}
-    onChange={(e) => setNewFolderName(e.target.value)}
-    style={{ padding: '0.5rem', marginRight: '0.5rem' }}
-  />
-  <button
-    onClick={async () => {
-      const name = newFolderName.trim();
-      if (!name || !user) return;
+      <h1>Habit Tracker</h1>
 
-      try {
-        await addDoc(collection(db, 'folders'), {
-          name,
-          userId: user.uid,
-        });
+      <div style={{ marginBottom: '1rem' }}>
+        <strong>Level:</strong> {profile.level}<br />
+        <strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}
+      </div>
 
-        setNewFolderName('');
-        // (optional) trigger reload of folder list later
-      } catch (err) {
-        console.error('Failed to create folder:', err);
-      }
-    }}
-    style={{ padding: '0.5rem 1rem' }}
-  >
-    Add Folder
-  </button>
-</div>
 
 
 <div style={{ marginBottom: '1rem' }}>
@@ -475,57 +455,157 @@ useEffect(() => {
     </button>
   </span>
 ))}
-
-
-
 </div>
 
 
-      <h1>Habit Loop</h1>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <strong>Level:</strong> {profile.level}<br />
-        <strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}
-      </div>
 
-     <form onSubmit={addHabit} style={{ marginBottom: '1.5rem' }}>
-  <select
-    onChange={e => setInputType(e.target.value)}
-    style={{ padding: '0.5rem', marginRight: '0.5rem' }}
+
+     {!showAddHabitForm ? (
+  <button
+    onClick={() => setShowAddHabitForm(true)}
+    style={{ padding: '0.5rem 1rem', marginBottom: '1.5rem' }}
   >
-    <option value="checkbox">Checkbox</option>
-    <option value="numeric">Numeric</option>
-    <option value="journal">Journal</option>
-  </select>
-
-  <input
-    type="text"
-    placeholder="Habit name"
-    value={habitInput}
-    onChange={e => setHabitInput(e.target.value)}
-    style={{ padding: '0.5rem', width: '30%' }}
-  />
-
-  <input
-    type="number"
-    placeholder="XP value"
-    value={xpInput}
-    onChange={e => setXpInput(e.target.value)}
-    style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
-  />
-
-  <input
-    type="text"
-    placeholder="Folder"
-    value={folderInput}
-    onChange={e => setFolderInput(e.target.value)}
-    style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
-  />
-
-  <button style={{ padding: '0.5rem 1rem', marginLeft: '0.5rem' }}>
     Add Habit
   </button>
-</form>
+) : (
+  <form
+    onSubmit={async (e) => {
+      e.preventDefault();
+      const name = habitInput.trim();
+      const xpVal = parseInt(xpInput, 10);
+      if (!name || isNaN(xpVal)) return;
+
+      const newHabit = {
+        userId: user.uid,
+        inputType,
+        name,
+        xpValue: xpVal,
+        calendar: {},
+        values: {},
+        subGoals: [],
+        folder: folderInput || "Uncategorized"
+      };
+
+      try {
+        await addDoc(collection(db, 'habits'), newHabit);
+
+        const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+        const snapshot = await getDocs(q);
+        const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        setHabits(loadedHabits);
+      } catch (error) {
+        console.error('Failed to save habit:', error);
+      }
+
+      setHabitInput('');
+      setXpInput('');
+      setFolderInput('');
+      setShowAddHabitForm(false);
+    }}
+    style={{ marginBottom: '1.5rem' }}
+  >
+    <select
+      onChange={e => setInputType(e.target.value)}
+      style={{ padding: '0.5rem', marginRight: '0.5rem' }}
+    >
+      <option value="checkbox">Checkbox</option>
+      <option value="numeric">Numeric</option>
+      <option value="journal">Journal</option>
+    </select>
+
+    <input
+      type="text"
+      placeholder="Habit name"
+      value={habitInput}
+      onChange={e => setHabitInput(e.target.value)}
+      style={{ padding: '0.5rem', width: '30%' }}
+    />
+
+    <input
+      type="number"
+      placeholder="XP value"
+      value={xpInput}
+      onChange={e => setXpInput(e.target.value)}
+      style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
+    />
+
+    <input
+      type="text"
+      placeholder="Folder"
+      value={folderInput}
+      onChange={e => setFolderInput(e.target.value)}
+      style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
+    />
+
+    <button style={{ padding: '0.5rem 1rem', marginLeft: '0.5rem' }}>
+      Save
+    </button>
+    <button
+      type="button"
+      onClick={() => setShowAddHabitForm(false)}
+      style={{ padding: '0.5rem 1rem', marginLeft: '0.5rem' }}
+    >
+      Cancel
+    </button>
+  </form>
+)}
+
+
+
+
+{!showAddFolderForm ? (
+  <button
+    onClick={() => setShowAddFolderForm(true)}
+    style={{ padding: '0.5rem 1rem', marginLeft: '1rem' }}
+  >
+    Add Folder
+  </button>
+) : (
+  <form
+    onSubmit={async (e) => {
+      e.preventDefault();
+      const name = newFolderName.trim();
+      if (!name || !user) return;
+
+      try {
+        await addDoc(collection(db, 'folders'), {
+          name,
+          userId: user.uid,
+        });
+
+        const snapshot = await getDocs(query(collection(db, 'folders'), where('userId', '==', user.uid)));
+        const loadedFolders = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        setFolders(loadedFolders);
+
+        setNewFolderName('');
+        setShowAddFolderForm(false);
+      } catch (err) {
+        console.error('Failed to create folder:', err);
+      }
+    }}
+    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginLeft: '1rem' }}
+  >
+    <input
+      type="text"
+      placeholder="Folder name"
+      value={newFolderName}
+      onChange={(e) => setNewFolderName(e.target.value)}
+      style={{ padding: '0.5rem' }}
+    />
+    <button style={{ padding: '0.5rem 1rem' }}>Save</button>
+    <button
+      type="button"
+      onClick={() => {
+        setShowAddFolderForm(false);
+        setNewFolderName('');
+      }}
+      style={{ padding: '0.5rem 1rem' }}
+    >
+      Cancel
+    </button>
+  </form>
+)}
 
 
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
@@ -552,8 +632,57 @@ useEffect(() => {
             <React.Fragment key={h.id}>
               <tr>
                 <td style={{ padding: '0.5rem' }}>
-                  <input type="text" value={h.name} onChange={e => editHabit(h.id, 'name', e.target.value)} style={{ width: '90%' }} />
-                </td>
+  {renamingHabitId === h.id ? (
+    <div style={{ display: 'flex', gap: '0.25rem' }}>
+      <input
+        type="text"
+        value={renamingHabitName}
+        onChange={e => setRenamingHabitName(e.target.value)}
+        style={{ width: '70%' }}
+      />
+      <button
+        onClick={async () => {
+          try {
+            const habitRef = doc(db, 'habits', h.id);
+            await updateDoc(habitRef, { name: renamingHabitName });
+
+            const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+            const snapshot = await getDocs(q);
+            const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            setHabits(loadedHabits);
+
+            setRenamingHabitId(null);
+            setRenamingHabitName('');
+          } catch (err) {
+            console.error('Failed to save habit name:', err);
+          }
+        }}
+      >
+        Save
+      </button>
+      <button onClick={() => {
+        setRenamingHabitId(null);
+        setRenamingHabitName('');
+      }}>
+        Cancel
+      </button>
+    </div>
+  ) : (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span>{h.name}</span>
+      <button
+        onClick={() => {
+          setRenamingHabitId(h.id);
+          setRenamingHabitName(h.name);
+        }}
+        style={{ marginLeft: '0.5rem' }}
+      >
+        Edit
+      </button>
+    </div>
+  )}
+</td>
+
                 <td style={{ textAlign: 'center' }}>{h.xpValue}</td>
                 {past30Days.map(date => (
                   <td key={date} style={{ textAlign: 'center' }}>
