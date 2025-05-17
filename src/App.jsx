@@ -39,13 +39,15 @@ const auth = getAuth();
 const loadHabits = async () => {
   if (!user) return;
   try {
-  await addDoc(collection(db, 'habits'), newHabit);
-  await loadHabits();
-} catch (error) {
-  console.error('Failed to save habit:', error);
-}
-
+    const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
+    const snapshot = await getDocs(q);
+    const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+    setHabits(loadedHabits);
+  } catch (err) {
+    console.error('Failed to load habits:', err);
+  }
 };
+
 
 
 
