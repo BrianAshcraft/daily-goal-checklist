@@ -35,6 +35,13 @@ const [renamingHabitId, setRenamingHabitId] = useState(null);
 const [renamingHabitName, setRenamingHabitName] = useState('');
 const [showAddHabitForm, setShowAddHabitForm] = useState(false);
 const [showAddFolderForm, setShowAddFolderForm] = useState(false);
+const [showJournalEditor, setShowJournalEditor] = useState(false);
+const [currentJournalData, setCurrentJournalData] = useState({
+  habitId: null,
+  date: null,
+  value: ''
+});
+
 const auth = getAuth();
 const loadHabits = async () => {
   if (!user) return;
@@ -152,29 +159,18 @@ useEffect(() => {
 
 
   const handleJournalEntry = async (habitId, date, currentValue, xpValue) => {
-    const entry = prompt('Journal entry:', currentValue || '');
-    if (entry === null) return;
+    setCurrentJournalData({
+  habitId,
+  date,
+  value: currentValue || ''
+});
+setShowJournalEditor(true);
+
   
     try {
       const habitRef = doc(db, 'habits', habitId);
       const snapshot = await getDoc(habitRef);
       if (!snapshot.exists()) return;
-  
-      const habitData = snapshot.data();
-      const alreadyLogged = !!habitData.values?.[date];
-  
-      const updatedValues = { ...(habitData.values || {}), [date]: entry };
-  
-      await updateDoc(habitRef, { values: updatedValues });
-  
-      if (!alreadyLogged && entry.trim() !== '') {
-        awardXp(xpValue);
-      }
-  
-      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
-      const refreshed = await getDocs(q);
-      const loaded = refreshed.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setHabits(loaded);
     } catch (err) {
       console.error('Failed to save journal entry:', err);
     }
@@ -225,14 +221,15 @@ useEffect(() => {
   
 
 
-  const handleDelete = async (id) => {
-    try {
-      await deleteDoc(doc(db, 'habits', id.toString()));
-      setHabits(prev => prev.filter(h => h.id !== id));
-    } catch (err) {
-      console.error('Failed to delete habit from Firestore:', err);
-    }
-  };
+const handleDelete = async (id) => {
+  try {
+    await deleteDoc(doc(db, 'habits', id.toString()));
+    await loadHabits();
+  } catch (err) {
+    console.error('Failed to delete habit from Firestore:', err);
+  }
+};
+
   
 
   const handleDeleteSub = async (habitId, subId) => {
@@ -366,12 +363,20 @@ useEffect(() => {
       </div>
     )}
 
-      <h1>Habit Tracker</h1>
+      <div
+  style={{
+    marginBottom: '1.5rem',
+    paddingBottom: '1rem',
+    borderBottom: '2px solid #ccc',
+  }}
+>
+  <h1 style={{ margin: 0 }}>Habit Tracker</h1>
+  <div>
+    <strong>Level:</strong> {profile.level}<br />
+    <strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}
+  </div>
+</div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <strong>Level:</strong> {profile.level}<br />
-        <strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}
-      </div>
 
 
 
@@ -446,7 +451,8 @@ useEffect(() => {
       }}
       style={{
         padding: '0.25rem 0.5rem',
-        backgroundColor: '#993333',
+        backgroundColor: '#1e3f66'
+,
         color: 'white',
         border: 'none',
         borderRadius: '0 4px 4px 0',
@@ -609,11 +615,14 @@ useEffect(() => {
   </form>
 )}
 
-
+<div style={{ minHeight: '400px' }}>
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
           <tr>
-            <th style={{ borderBottom: '1px solid #333', padding: '0.5rem' }}>Habit / Sub-goal</th>
+            <th style={{ borderBottom: '1px solid #333', padding: '0.5rem', textAlign: 'left' }}>
+  Habit / Sub-goal
+</th>
+
             <th style={{ borderBottom: '1px solid #333', padding: '0.5rem' }}>XP</th>
             {past30Days.map(date => (
               <th key={date} style={{ borderBottom: '1px solid #333', padding: '0.5rem', whiteSpace: 'nowrap' }}>{date.slice(5)}</th>
@@ -673,18 +682,41 @@ useEffect(() => {
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>{h.name}</span>
       <button
-        onClick={() => {
-          setRenamingHabitId(h.id);
-          setRenamingHabitName(h.name);
-        }}
-        style={{ marginLeft: '0.5rem' }}
-      >
-        Edit
-      </button>
+  onClick={() => {
+    setRenamingHabitId(h.id);
+    setRenamingHabitName(h.name);
+  }}
+  style={{
+    marginLeft: '0.5rem',
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+  }}
+  title="Edit"
+  aria-label="Edit"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: 'block' }}
+  >
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+  </svg>
+</button>
     </div>
   )}
 </td>
-
                 <td style={{ textAlign: 'center' }}>{h.xpValue}</td>
                 {past30Days.map(date => (
                   <td key={date} style={{ textAlign: 'center' }}>
@@ -729,8 +761,6 @@ useEffect(() => {
   }}
   style={{ width: '4rem' }}
 />
-
-
                     ) : (
                       <input
                         type="checkbox"
@@ -844,7 +874,118 @@ useEffect(() => {
           ))}
         </tbody>
       </table>
+      
+      </div>
+
+    {showJournalEditor && (
+  <div
+    style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      zIndex: 999,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+    }}
+  >
+    <div
+  style={{
+    width: '90vw',
+    maxWidth: '700px',
+    height: '85vh',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',       // Slight transparency
+    backdropFilter: 'blur(10px)',                      // Frosted blur
+    WebkitBackdropFilter: 'blur(10px)',                // Safari support
+    border: '1px solid rgba(255, 255, 255, 0.2)',       // Light border
+    borderRadius: '12px',
+    boxShadow: '0 0 20px rgba(0, 0, 0, 0.2)',           // Soft shadow
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '1.5rem',
+    overflow: 'hidden',                                // Ensures no internal overflow
+  }}
+>
+
+
+      <h2 style={{ marginTop: 0 }}>Journal Entry – {currentJournalData.date}</h2>
+
+      <textarea
+        value={currentJournalData.value}
+        onChange={(e) =>
+          setCurrentJournalData((prev) => ({
+            ...prev,
+            value: e.target.value,
+          }))
+        }
+        style={{
+  flex: 1,
+  padding: '1rem',
+  fontSize: '1rem',
+  resize: 'none',
+  marginBottom: '1rem',
+  width: '100%',
+  maxWidth: '100%',
+  boxSizing: 'border-box',              // Ensures padding doesn't overflow container
+  border: '1px solid #ccc',
+  borderRadius: '8px',
+  backgroundColor: 'rgba(2, 2, 2, 0.8)',
+  outline: 'none',
+}}
+
+      />
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+        <button
+          onClick={async () => {
+            try {
+              const habitRef = doc(db, 'habits', currentJournalData.habitId);
+              const snapshot = await getDoc(habitRef);
+              if (!snapshot.exists()) return;
+
+              const habitData = snapshot.data();
+              const alreadyLogged = !!habitData.values?.[currentJournalData.date];
+
+              const updatedValues = {
+                ...(habitData.values || {}),
+                [currentJournalData.date]: currentJournalData.value,
+              };
+
+              await updateDoc(habitRef, { values: updatedValues });
+
+              if (!alreadyLogged && currentJournalData.value.trim() !== '') {
+                awardXp(habitData.xpValue);
+              }
+
+              await loadHabits();
+              setShowJournalEditor(false);
+              setCurrentJournalData({ habitId: null, date: null, value: '' });
+            } catch (err) {
+              console.error('Failed to save journal entry:', err);
+            }
+          }}
+        >
+          Save
+        </button>
+
+        <button
+          onClick={() => {
+            setShowJournalEditor(false);
+            setCurrentJournalData({ habitId: null, date: null, value: '' });
+          }}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
+  </div>
+)}
+
+</div>
   );
 }
 
