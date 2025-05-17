@@ -12,6 +12,99 @@ import { deleteDoc } from 'firebase/firestore';
 
 
 function App() {
+
+  const [user, setUser] = useState(null);
+  const auth = getAuth();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  return user ? <MainApp user={user} /> : <LoginScreen />;
+}
+  function LoginScreen() {
+  const auth = getAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleLogin = async (e) => {
+    e.preventDefault(); // prevent page reload
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      console.error('Login failed:', err);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        height: '100vh',
+        width: '100vw',
+        backgroundColor: '#111',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'sans-serif'
+      }}
+    >
+      <h2>Welcome to Habit Tracker</h2>
+
+      <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{
+            margin: '0.5rem 0',
+            padding: '0.75rem',
+            width: '250px',
+            borderRadius: '6px',
+            border: '1px solid #ccc'
+          }}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{
+            marginBottom: '1rem',
+            padding: '0.75rem',
+            width: '250px',
+            borderRadius: '6px',
+            border: '1px solid #ccc'
+          }}
+        />
+
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button type="submit" style={{ padding: '0.75rem 1.5rem' }}>
+            Log In
+          </button>
+          <button
+            type="button"
+            onClick={() => createUserWithEmailAndPassword(auth, email, password)}
+            style={{ padding: '0.75rem 1.5rem' }}
+          >
+            Sign Up
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+
+
+
+function MainApp({ user }) {
+  
   const [editingHabitId, setEditingHabitId] = useState(null);
 const [folders, setFolders] = useState([]);
   const [habits, setHabits] = useState([]);
@@ -24,8 +117,6 @@ const [folders, setFolders] = useState([]);
   const [subXp, setSubXp] = useState('');
 
   
-
-  const [user, setUser] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [folderInput, setFolderInput] = useState('');
@@ -80,13 +171,6 @@ useEffect(() => {
   loadProfile();
 }, [user]);
 
-
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    setUser(user);
-  });
-  return () => unsubscribe();
-}, []);
 
 useEffect(() => {
   if (!user) return;
@@ -370,7 +454,7 @@ const handleDelete = async (id) => {
     borderBottom: '2px solid #ccc',
   }}
 >
-  <h1 style={{ margin: 0 }}>Habit Tracker</h1>
+  <h1 style={{ margin: 0 }}>Everything Tracker</h1>
   <div>
     <strong>Level:</strong> {profile.level}<br />
     <strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}
@@ -988,5 +1072,6 @@ const handleDelete = async (id) => {
 </div>
   );
 }
+
 
 export default App;
