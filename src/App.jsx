@@ -8,9 +8,6 @@ import { getDoc } from 'firebase/firestore';
 import { deleteDoc } from 'firebase/firestore';
 
 
-
-
-
 function App() {
 
   const [user, setUser] = useState(null);
@@ -53,8 +50,7 @@ function App() {
         fontFamily: 'sans-serif'
       }}
     >
-      <h2>Welcome to Habit Tracker</h2>
-
+      <h2>Welcome to Everything Tracker</h2>
       <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <input
           type="email"
@@ -82,7 +78,6 @@ function App() {
             border: '1px solid #ccc'
           }}
         />
-
         <div style={{ display: 'flex', gap: '1rem' }}>
           <button type="submit" style={{ padding: '0.75rem 1.5rem' }}>
             Log In
@@ -100,6 +95,37 @@ function App() {
   );
 }
 
+function NumericInputCell({ habit, date, xp, onSave }) {
+  const initial = habit.values?.[date] || '';
+  const [value, setValue] = useState(initial);
+
+  useEffect(() => {
+    setValue(initial);
+  }, [initial]);
+
+  const handleSave = async () => {
+    if (value === initial) return;
+    await onSave(value);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.target.blur(); // Triggers save through onBlur
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={handleSave}
+      onKeyDown={handleKeyDown}
+      style={{ width: '4rem' }}
+    />
+  );
+}
 
 
 
@@ -145,9 +171,6 @@ const loadHabits = async () => {
     console.error('Failed to load habits:', err);
   }
 };
-
-
-
 
 useEffect(() => {
   if (!user) return;
@@ -240,8 +263,6 @@ useEffect(() => {
     });
   };
   
-
-
   const handleJournalEntry = async (habitId, date, currentValue, xpValue) => {
     setCurrentJournalData({
   habitId,
@@ -302,9 +323,6 @@ setShowJournalEditor(true);
     }
   };
   
-  
-
-
 const handleDelete = async (id) => {
   try {
     await deleteDoc(doc(db, 'habits', id.toString()));
@@ -312,9 +330,7 @@ const handleDelete = async (id) => {
   } catch (err) {
     console.error('Failed to delete habit from Firestore:', err);
   }
-};
-
-  
+};  
 
   const handleDeleteSub = async (habitId, subId) => {
     try {
@@ -343,7 +359,6 @@ const handleDelete = async (id) => {
     const name = habitInput.trim();
     const xpVal = parseInt(xpInput, 10);
     if (!name || isNaN(xpVal)) return;
-  
     const newHabit = {
       userId: user.uid,
       inputType,
@@ -352,11 +367,9 @@ const handleDelete = async (id) => {
       calendar: {},
       values: {},
       subGoals: []
-    };
-  
+    }; 
     try {
       await addDoc(collection(db, 'habits'), newHabit);
-  
       // Immediately reload all habits from Firestore to reflect the new one
       const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
       const snapshot = await getDocs(q);
@@ -371,9 +384,6 @@ const handleDelete = async (id) => {
     setXpInput('');
   };
   
-    
-  
-
   const addSubGoal = async (e, parentId) => {
     e.preventDefault();
     const name = subName.trim();
@@ -418,50 +428,41 @@ const handleDelete = async (id) => {
   };
   
   return (
-
   <div style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '100%', overflowX: 'auto' }}>
-    {!user ? (
-      <div style={{ marginBottom: '1rem' }}>
-        <h3>Login or Sign Up</h3>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ marginRight: '0.5rem' }}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ marginRight: '0.5rem' }}
-        />
-        <button onClick={() => createUserWithEmailAndPassword(auth, email, password)}>Sign Up</button>
-        <button onClick={() => signInWithEmailAndPassword(auth, email, password)}>Log In</button>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div>
+        <h1 style={{ margin: 0 }}>Everything Tracker</h1>
       </div>
-    ) : (
-      <div style={{ marginBottom: '1rem' }}>
-        Logged in as <strong>{user.email}</strong>
-        <button onClick={() => signOut(auth)} style={{ marginLeft: '1rem' }}>Log Out</button>
+      <div style={{
+        textAlign: 'right',
+        fontSize: '0.9rem',
+        padding: '0.5rem 1rem',
+        backgroundColor: '#1a1a1a',
+        color: 'white',
+        borderRadius: '8px',
+        boxShadow: '0 0 5px rgba(0, 0, 0, 0.3)'
+      }}>
+        <div><strong>{user.email}</strong></div>
+        <div><strong>Level:</strong> {profile.level}</div>
+        <div><strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}</div>
+        <button
+          onClick={() => signOut(auth)}
+          style={{
+            marginTop: '0.5rem',
+            padding: '0.25rem 0.5rem',
+            backgroundColor: '#333',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Log Out
+        </button>
       </div>
-    )}
+    </div>
 
-      <div
-  style={{
-    marginBottom: '1.5rem',
-    paddingBottom: '1rem',
-    borderBottom: '2px solid #ccc',
-  }}
->
-  <h1 style={{ margin: 0 }}>Everything Tracker</h1>
-  <div>
-    <strong>Level:</strong> {profile.level}<br />
-    <strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}
-  </div>
-</div>
-
-
+    <hr style={{ margin: '1rem 0', border: 'none', borderTop: '2px solid #ccc' }} />
 
 
 <div style={{ marginBottom: '1rem' }}>
@@ -481,7 +482,6 @@ const handleDelete = async (id) => {
 >
   Uncategorized
 </button>
-
 
 {folders.map(f => (
   <span key={f.id} style={{ marginRight: '0.5rem', display: 'inline-flex', alignItems: 'center' }}>
@@ -516,16 +516,13 @@ const handleDelete = async (id) => {
           });
 
           await Promise.all(batchPromises);
-
           // Step 3: Reload everything
           const habitSnapshot = await getDocs(query(collection(db, 'habits'), where('userId', '==', user.uid)));
           const loadedHabits = habitSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
           setHabits(loadedHabits);
-
           const folderSnapshot = await getDocs(query(collection(db, 'folders'), where('userId', '==', user.uid)));
           const loadedFolders = folderSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
           setFolders(loadedFolders);
-
           if (activeFolder === f.name) {
             setActiveFolder(null);
           }
@@ -549,10 +546,6 @@ const handleDelete = async (id) => {
 ))}
 </div>
 
-
-
-
-
      {!showAddHabitForm ? (
   <button
     onClick={() => setShowAddHabitForm(true)}
@@ -567,7 +560,6 @@ const handleDelete = async (id) => {
       const name = habitInput.trim();
       const xpVal = parseInt(xpInput, 10);
       if (!name || isNaN(xpVal)) return;
-
       const newHabit = {
         userId: user.uid,
         inputType,
@@ -578,10 +570,8 @@ const handleDelete = async (id) => {
         subGoals: [],
         folder: folderInput || "Uncategorized"
       };
-
       try {
         await addDoc(collection(db, 'habits'), newHabit);
-
         const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
         const snapshot = await getDocs(q);
         const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -589,7 +579,6 @@ const handleDelete = async (id) => {
       } catch (error) {
         console.error('Failed to save habit:', error);
       }
-
       setHabitInput('');
       setXpInput('');
       setFolderInput('');
@@ -605,7 +594,6 @@ const handleDelete = async (id) => {
       <option value="numeric">Numeric</option>
       <option value="journal">Journal</option>
     </select>
-
     <input
       type="text"
       placeholder="Habit name"
@@ -613,7 +601,6 @@ const handleDelete = async (id) => {
       onChange={e => setHabitInput(e.target.value)}
       style={{ padding: '0.5rem', width: '30%' }}
     />
-
     <input
       type="number"
       placeholder="XP value"
@@ -621,7 +608,6 @@ const handleDelete = async (id) => {
       onChange={e => setXpInput(e.target.value)}
       style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
     />
-
     <input
       type="text"
       placeholder="Folder"
@@ -629,7 +615,6 @@ const handleDelete = async (id) => {
       onChange={e => setFolderInput(e.target.value)}
       style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
     />
-
     <button style={{ padding: '0.5rem 1rem', marginLeft: '0.5rem' }}>
       Save
     </button>
@@ -642,9 +627,6 @@ const handleDelete = async (id) => {
     </button>
   </form>
 )}
-
-
-
 
 {!showAddFolderForm ? (
   <button
@@ -659,7 +641,6 @@ const handleDelete = async (id) => {
       e.preventDefault();
       const name = newFolderName.trim();
       if (!name || !user) return;
-
       try {
         await addDoc(collection(db, 'folders'), {
           name,
@@ -698,15 +679,14 @@ const handleDelete = async (id) => {
     </button>
   </form>
 )}
-
 <div style={{ minHeight: '400px' }}>
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
           <tr>
+
             <th style={{ borderBottom: '1px solid #333', padding: '0.5rem', textAlign: 'left' }}>
   Habit / Sub-goal
 </th>
-
             <th style={{ borderBottom: '1px solid #333', padding: '0.5rem' }}>XP</th>
             {past30Days.map(date => (
               <th key={date} style={{ borderBottom: '1px solid #333', padding: '0.5rem', whiteSpace: 'nowrap' }}>{date.slice(5)}</th>
@@ -723,9 +703,9 @@ const handleDelete = async (id) => {
     return h.folder === activeFolder;
   })
   .map(h => (
-
             <React.Fragment key={h.id}>
-              <tr>
+              <tr style={{ borderBottom: '1px solid #111' }}>
+
                 <td style={{ padding: '0.5rem' }}>
   {renamingHabitId === h.id ? (
     <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -740,12 +720,10 @@ const handleDelete = async (id) => {
           try {
             const habitRef = doc(db, 'habits', h.id);
             await updateDoc(habitRef, { name: renamingHabitName });
-
             const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
             const snapshot = await getDocs(q);
             const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
             setHabits(loadedHabits);
-
             setRenamingHabitId(null);
             setRenamingHabitName('');
           } catch (err) {
@@ -807,44 +785,50 @@ const handleDelete = async (id) => {
                     {h.inputType === 'journal' ? (
                       <button
                       onClick={() => handleJournalEntry(h.id, date, h.values?.[date], h.xpValue)}
-                      style={{ width: '100%' }}
+                      style={{
+  width: '100%',
+  padding: '0.25rem 0.5rem',
+  fontSize: '0.85rem',
+  lineHeight: '1.2',
+  backgroundColor: '#222',
+  color: 'white',
+  border: '1px solid #444',
+  borderRadius: '10px',
+  cursor: 'pointer'
+}}
+
                     >
-                      {h.values?.[date] ? 'View Entry' : 'Add Entry'}
+                      {h.values?.[date] ? 'View/Edit' : 'Add Entry'}
                     </button>
                       
                     ) : h.inputType === 'numeric' ? (
-                      <input
-  type="number"
-  value={h.values?.[date] || ''}
-  onChange={async (e) => {
-    const value = e.target.value;
-
+                      <NumericInputCell
+  habit={h}
+  date={date}
+  xp={h.xpValue}
+  onSave={async (newValue) => {
     try {
       const habitRef = doc(db, 'habits', h.id);
       const snapshot = await getDoc(habitRef);
       if (!snapshot.exists()) return;
-
       const habitData = snapshot.data();
       const alreadyLogged = !!habitData.values?.[date];
 
-      const updatedValues = { ...(habitData.values || {}), [date]: value };
-
+      const updatedValues = { ...(habitData.values || {}), [date]: newValue };
       await updateDoc(habitRef, { values: updatedValues });
 
-      if (!alreadyLogged && value !== '') {
+      if (!alreadyLogged && newValue !== '') {
         awardXp(h.xpValue);
       }
 
-      const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
-      const refreshedSnapshot = await getDocs(q);
-      const loadedHabits = refreshedSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setHabits(loadedHabits);
+      await loadHabits(); // Refresh state after save
     } catch (err) {
-      console.error('Failed to update numeric input:', err);
+      console.error('Failed to save numeric input:', err);
     }
   }}
-  style={{ width: '4rem' }}
 />
+
+
                     ) : (
                       <input
                         type="checkbox"
@@ -865,11 +849,9 @@ const handleDelete = async (id) => {
           onChange={async (e) => {
             const folderName = e.target.value;
             if (!folderName) return;
-
             try {
               const habitRef = doc(db, 'habits', h.id);
               await updateDoc(habitRef, { folder: folderName });
-
               const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
               const snapshot = await getDocs(q);
               const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -892,7 +874,6 @@ const handleDelete = async (id) => {
       try {
         const habitRef = doc(db, 'habits', h.id);
         await updateDoc(habitRef, { folder: "Uncategorized" });
-
         const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
         const snapshot = await getDocs(q);
         const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -910,11 +891,9 @@ const handleDelete = async (id) => {
   padding: '0.25rem 0.5rem',
   cursor: 'pointer'
 }}
-
   >
     Remove from Folder
   </button>
-
       <button
         onClick={() => setEditingHabitId(null)}
         style={{ marginTop: '0.25rem' }}
@@ -926,7 +905,6 @@ const handleDelete = async (id) => {
     <button onClick={() => setEditingHabitId(h.id)}>Edit</button>
   )}
 </td>
-
               </tr>
               {h.subGoals.map(s => (
                 <tr key={s.id}>
@@ -958,9 +936,7 @@ const handleDelete = async (id) => {
           ))}
         </tbody>
       </table>
-      
       </div>
-
     {showJournalEditor && (
   <div
     style={{
@@ -994,10 +970,7 @@ const handleDelete = async (id) => {
     overflow: 'hidden',                                // Ensures no internal overflow
   }}
 >
-
-
       <h2 style={{ marginTop: 0 }}>Journal Entry – {currentJournalData.date}</h2>
-
       <textarea
         value={currentJournalData.value}
         onChange={(e) =>
@@ -1020,9 +993,7 @@ const handleDelete = async (id) => {
   backgroundColor: 'rgba(2, 2, 2, 0.8)',
   outline: 'none',
 }}
-
       />
-
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
         <button
           onClick={async () => {
@@ -1030,21 +1001,16 @@ const handleDelete = async (id) => {
               const habitRef = doc(db, 'habits', currentJournalData.habitId);
               const snapshot = await getDoc(habitRef);
               if (!snapshot.exists()) return;
-
               const habitData = snapshot.data();
               const alreadyLogged = !!habitData.values?.[currentJournalData.date];
-
               const updatedValues = {
                 ...(habitData.values || {}),
                 [currentJournalData.date]: currentJournalData.value,
               };
-
               await updateDoc(habitRef, { values: updatedValues });
-
               if (!alreadyLogged && currentJournalData.value.trim() !== '') {
                 awardXp(habitData.xpValue);
               }
-
               await loadHabits();
               setShowJournalEditor(false);
               setCurrentJournalData({ habitId: null, date: null, value: '' });
@@ -1055,7 +1021,6 @@ const handleDelete = async (id) => {
         >
           Save
         </button>
-
         <button
           onClick={() => {
             setShowJournalEditor(false);
@@ -1068,10 +1033,7 @@ const handleDelete = async (id) => {
     </div>
   </div>
 )}
-
 </div>
   );
 }
-
-
 export default App;
