@@ -50,7 +50,7 @@ function App() {
         fontFamily: 'sans-serif'
       }}
     >
-      <h2>Welcome to Everything Tracker</h2>
+      <h2>Welcome to poopy butthole Tracker</h2>
       <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <input
           type="email"
