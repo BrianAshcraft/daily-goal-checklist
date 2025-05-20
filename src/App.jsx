@@ -131,6 +131,9 @@ function NumericInputCell({ habit, date, xp, onSave }) {
 
 function MainApp({ user }) {
   
+  const [daysShown, setDaysShown] = useState(7);
+const [datePage, setDatePage] = useState(0); 
+
   const [editingHabitId, setEditingHabitId] = useState(null);
 const [folders, setFolders] = useState([]);
   const [habits, setHabits] = useState([]);
@@ -217,7 +220,8 @@ useEffect(() => {
     return result;
   };
 
-  const past30Days = getPastDates(7);
+const past30Days = getPastDates(daysShown);
+
 
 useEffect(() => {
   if (!user) return;
@@ -680,6 +684,24 @@ const handleDelete = async (id) => {
   </form>
 )}
 <div style={{ minHeight: '400px' }}>
+  <div style={{ marginBottom: '1rem' }}>
+  <label htmlFor="day-range" style={{ marginRight: '0.5rem' }}>
+    Show past
+  </label>
+  <select
+    id="day-range"
+    value={daysShown}
+    onChange={(e) => setDaysShown(Number(e.target.value))}
+    style={{ padding: '0.25rem 0.5rem' }}
+  >
+    <option value={7}>7 days</option>
+    <option value={14}>14 days</option>
+    <option value={30}>30 days</option>
+    <option value={60}>60 days</option>
+    <option value={90}>90 days</option>
+  </select>
+</div>
+
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
           <tr>
