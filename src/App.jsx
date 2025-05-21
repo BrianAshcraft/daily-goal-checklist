@@ -10,6 +10,9 @@ import { deleteDoc } from 'firebase/firestore';
 
 function App() {
 
+
+  
+
   const [user, setUser] = useState(null);
   const auth = getAuth();
 
@@ -131,6 +134,11 @@ function NumericInputCell({ habit, date, xp, onSave }) {
 
 function MainApp({ user }) {
   
+
+  const [endDate, setEndDate] = useState(() => {
+  const today = new Date();
+  return today.toISOString().split('T')[0]; // default to today
+});
   const [daysShown, setDaysShown] = useState(7);
 const [datePage, setDatePage] = useState(0); 
 
@@ -210,17 +218,19 @@ useEffect(() => {
     return Math.floor(threshold);
   };
 
-  const getPastDates = (days) => {
-    const result = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      result.push(date.toISOString().split('T')[0]);
-    }
-    return result;
-  };
+const getPastDates = (days, endDateString) => {
+  const end = new Date(endDateString);
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(end);
+    date.setDate(end.getDate() - i);
+    result.push(date.toISOString().split('T')[0]);
+  }
+  return result;
+};
 
-const past30Days = getPastDates(daysShown);
+const visibleDates = getPastDates(daysShown, endDate);
+
 
 
 useEffect(() => {
@@ -684,23 +694,34 @@ const handleDelete = async (id) => {
   </form>
 )}
 <div style={{ minHeight: '400px' }}>
-  <div style={{ marginBottom: '1rem' }}>
-  <label htmlFor="day-range" style={{ marginRight: '0.5rem' }}>
+  <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+  {/* <label>
     Show past
+    <select
+      value={daysShown}
+      onChange={(e) => setDaysShown(Number(e.target.value))}
+      style={{ marginLeft: '0.5rem', padding: '0.25rem 0.5rem' }}
+    >
+      <option value={7}>7 days</option>
+      <option value={14}>14 days</option>
+      <option value={30}>30 days</option>
+      <option value={60}>60 days</option>
+      <option value={90}>90 days</option>
+    </select>
+  </label> */}
+
+  <label>
+    End Date
+    <input
+      type="date"
+      value={endDate}
+      onChange={(e) => setEndDate(e.target.value)}
+      max={new Date().toISOString().split('T')[0]}
+      style={{ marginLeft: '0.5rem', padding: '0.25rem 0.5rem' }}
+    />
   </label>
-  <select
-    id="day-range"
-    value={daysShown}
-    onChange={(e) => setDaysShown(Number(e.target.value))}
-    style={{ padding: '0.25rem 0.5rem' }}
-  >
-    <option value={7}>7 days</option>
-    <option value={14}>14 days</option>
-    <option value={30}>30 days</option>
-    <option value={60}>60 days</option>
-    <option value={90}>90 days</option>
-  </select>
 </div>
+
 
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
@@ -710,7 +731,7 @@ const handleDelete = async (id) => {
   Habit / Sub-goal
 </th>
             <th style={{ borderBottom: '1px solid #333', padding: '0.5rem' }}>XP</th>
-            {past30Days.map(date => (
+            {visibleDates.map(date => (
               <th key={date} style={{ borderBottom: '1px solid #333', padding: '0.5rem', whiteSpace: 'nowrap' }}>{date.slice(5)}</th>
             ))}
             <th style={{ borderBottom: '1px solid #333', padding: '0.5rem' }}>Actions</th>
@@ -802,7 +823,7 @@ const handleDelete = async (id) => {
   )}
 </td>
                 <td style={{ textAlign: 'center' }}>{h.xpValue}</td>
-                {past30Days.map(date => (
+                {visibleDates.map(date => (
                   <td key={date} style={{ textAlign: 'center' }}>
                     {h.inputType === 'journal' ? (
                       <button
@@ -932,7 +953,7 @@ const handleDelete = async (id) => {
                 <tr key={s.id}>
                   <td style={{ padding: '0.5rem 0.5rem 0.5rem 2rem' }}>{s.name}</td>
                   <td style={{ textAlign: 'center' }}>{s.xpValue}</td>
-                  {past30Days.map(date => (
+                  {visibleDates.map(date => (
                     <td key={date} style={{ textAlign: 'center' }}>
                       <input type="checkbox" checked={!!s.calendar?.[date]} onChange={() => toggleCalendarMark(h.id, date, s.id)} />
                     </td>
