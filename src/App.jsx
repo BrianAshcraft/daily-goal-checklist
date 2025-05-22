@@ -191,11 +191,16 @@ useEffect(() => {
       const userRef = doc(db, 'profiles', user.uid);
       const snapshot = await getDoc(userRef);
       if (snapshot.exists()) {
-        setProfile(snapshot.data());
+        const data = snapshot.data();
+        setProfile({
+          xp: data.xp || 0,
+          level: data.level || 0,
+          xpEnabled: data.xpEnabled !== false // default to true if not set
+        });
       } else {
         // Set a new profile if it doesn't exist
-        await setDoc(userRef, { xp: 0, level: 0 });
-        setProfile({ xp: 0, level: 0 });
+        await setDoc(userRef, { xp: 0, level: 0, xpEnabled: true });
+        setProfile({ xp: 0, level: 0, xpEnabled: true });
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -204,6 +209,7 @@ useEffect(() => {
 
   loadProfile();
 }, [user]);
+
 
 
 useEffect(() => {
@@ -448,32 +454,54 @@ const handleDelete = async (id) => {
         <h1 style={{ margin: 0 }}>Everything Tracker</h1>
       </div>
       <div style={{
-        textAlign: 'right',
-        fontSize: '0.9rem',
-        padding: '0.5rem 1rem',
-        backgroundColor: '#1a1a1a',
-        color: 'white',
-        borderRadius: '8px',
-        boxShadow: '0 0 5px rgba(0, 0, 0, 0.3)'
-      }}>
-        <div><strong>{user.email}</strong></div>
-        <div><strong>Level:</strong> {profile.level}</div>
-        <div><strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}</div>
-        <button
-          onClick={() => signOut(auth)}
-          style={{
-            marginTop: '0.5rem',
-            padding: '0.25rem 0.5rem',
-            backgroundColor: '#333',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Log Out
-        </button>
-      </div>
+  textAlign: 'right',
+  fontSize: '0.9rem',
+  padding: '0.5rem 1rem',
+  backgroundColor: '#1a1a1a',
+  color: 'white',
+  borderRadius: '8px',
+  boxShadow: '0 0 5px rgba(0, 0, 0, 0.3)'
+}}>
+  <div><strong>{user.email}</strong></div>
+
+  {profile.xpEnabled && (
+    <>
+      <div><strong>Level:</strong> {profile.level}</div>
+      <div><strong>XP:</strong> {profile.xp} / {getThreshold(profile.level + 1)}</div>
+    </>
+  )}
+
+  <label style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+    <input
+      type="checkbox"
+      checked={profile.xpEnabled}
+      onChange={async () => {
+        const newValue = !profile.xpEnabled;
+        setProfile(prev => ({ ...prev, xpEnabled: newValue }));
+
+        const userRef = doc(db, 'profiles', user.uid);
+        await updateDoc(userRef, { xpEnabled: newValue });
+      }}
+    />
+    Enable XP Tracking
+  </label>
+
+  <button
+    onClick={() => signOut(auth)}
+    style={{
+      marginTop: '0.5rem',
+      padding: '0.25rem 0.5rem',
+      backgroundColor: '#333',
+      color: 'white',
+      border: 'none',
+      borderRadius: '4px',
+      cursor: 'pointer'
+    }}
+  >
+    Log Out
+  </button>
+</div>
+
     </div>
 
     <hr style={{ margin: '1rem 0', border: 'none', borderTop: '2px solid #ccc' }} />
@@ -609,19 +637,23 @@ const handleDelete = async (id) => {
       <option value="journal">Journal</option>
     </select>
     <input
-      type="text"
-      placeholder="Habit name"
-      value={habitInput}
-      onChange={e => setHabitInput(e.target.value)}
-      style={{ padding: '0.5rem', width: '30%' }}
-    />
-    <input
-      type="number"
-      placeholder="XP value"
-      value={xpInput}
-      onChange={e => setXpInput(e.target.value)}
-      style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
-    />
+  type="text"
+  placeholder="Habit name"
+  value={habitInput}
+  onChange={e => setHabitInput(e.target.value)}
+  style={{ padding: '0.5rem', width: '30%' }}
+/>
+
+{profile.xpEnabled && (
+  <input
+    type="number"
+    placeholder="XP value"
+    value={xpInput}
+    onChange={e => setXpInput(e.target.value)}
+    style={{ padding: '0.5rem', width: '15%', marginLeft: '0.5rem' }}
+  />
+)}
+
     <input
       type="text"
       placeholder="Folder"
