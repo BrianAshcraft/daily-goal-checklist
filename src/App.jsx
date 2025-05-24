@@ -261,27 +261,33 @@ useEffect(() => {
 
 
   const awardXp = (amount) => {
-    setProfile(prev => {
-      let newXp = prev.xp + amount;
-      let newLevel = prev.level;
-  
-      while (newXp >= getThreshold(newLevel + 1)) {
-        newLevel++;
-      }
-  
-      const updatedProfile = { xp: newXp, level: newLevel };
-  
+  if (!profile.xpEnabled) return; // Exit early if XP tracking is off
 
-      if (user) {
-        const userRef = doc(db, 'profiles', user.uid);
-        setDoc(userRef, updatedProfile, { merge: true }).catch(err =>
-          console.error('Failed to save profile:', err)
-        );
-      }
-  
-      return updatedProfile;
-    });
-  };
+  setProfile(prev => {
+    let newXp = prev.xp + amount;
+    let newLevel = prev.level;
+
+    while (newXp >= getThreshold(newLevel + 1)) {
+      newLevel++;
+    }
+
+    const updatedProfile = {
+      ...prev,               // keep all existing profile fields (like xpEnabled!)
+      xp: newXp,
+      level: newLevel
+    };
+
+    if (user) {
+      const userRef = doc(db, 'profiles', user.uid);
+      setDoc(userRef, updatedProfile, { merge: true }).catch(err =>
+        console.error('Failed to save profile:', err)
+      );
+    }
+
+    return updatedProfile;
+  });
+};
+
   
   const handleJournalEntry = async (habitId, date, currentValue, xpValue) => {
     setCurrentJournalData({
@@ -476,12 +482,14 @@ const handleDelete = async (id) => {
       type="checkbox"
       checked={profile.xpEnabled}
       onChange={async () => {
-        const newValue = !profile.xpEnabled;
-        setProfile(prev => ({ ...prev, xpEnabled: newValue }));
+  const newValue = !profile.xpEnabled;
+  const updated = { ...profile, xpEnabled: newValue };
+  setProfile(updated);
 
-        const userRef = doc(db, 'profiles', user.uid);
-        await updateDoc(userRef, { xpEnabled: newValue });
-      }}
+  const userRef = doc(db, 'profiles', user.uid);
+  await updateDoc(userRef, updated);
+}}
+
     />
     Enable XP Tracking
   </label>
