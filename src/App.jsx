@@ -1115,8 +1115,23 @@ const handleDelete = async (id) => {
       </div>
     </div>
   </div>
+  
 )}
+<footer
+  style={{
+    marginTop: '2rem',
+    padding: '1rem',
+    textAlign: 'center',
+    color: '#888',
+    fontSize: '0.85rem'
+  }}
+>
+  © {new Date().getFullYear()} Everything Tracker by Brian Ashcraft
+</footer>
+
 </div>
+
   );
+
 }
 export default App;
