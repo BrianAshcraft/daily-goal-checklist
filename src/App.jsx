@@ -9,11 +9,8 @@ import { deleteDoc } from 'firebase/firestore';
 
 
 function App() {
-
-
-  
-
   const [user, setUser] = useState(null);
+  const [showRegister, setShowRegister] = useState(false); // new
   const auth = getAuth();
 
   useEffect(() => {
@@ -23,9 +20,17 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  return user ? <MainApp user={user} /> : <LoginScreen />;
+  if (user) {
+    return <MainApp user={user} />;
+  }
+
+  // decide what screen to show based on toggle
+  return showRegister
+    ? <RegisterScreen onSwitchToLogin={() => setShowRegister(false)} />
+    : <LoginScreen onSwitchToRegister={() => setShowRegister(true)} />;
 }
-  function LoginScreen() {
+
+  function LoginScreen({ onSwitchToRegister }) {
   const auth = getAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -85,13 +90,14 @@ function App() {
           <button type="submit" style={{ padding: '0.75rem 1.5rem' }}>
             Log In
           </button>
-          <button
-            type="button"
-            onClick={() => createUserWithEmailAndPassword(auth, email, password)}
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            Sign Up
-          </button>
+                <button
+        type="button"
+        onClick={onSwitchToRegister}
+        style={{ padding: '0.75rem 1.5rem' }}
+      >
+        Sign Up
+      </button>
+
         </div>
       </form>
     </div>
@@ -130,10 +136,104 @@ function NumericInputCell({ habit, date, xp, onSave }) {
   );
 }
 
+function RegisterScreen({ onSwitchToLogin }) {
+  const auth = getAuth();
+  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [xpEnabled, setXpEnabled] = useState(true); // default is ON
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      await setDoc(doc(db, 'profiles', user.uid), {
+        username,
+        email,
+        xp: 0,
+        level: 0,
+        xpEnabled,
+        isAdmin: false
+      });
+
+    } catch (err) {
+      console.error('Registration failed:', err);
+    }
+  };
+
+  return (
+    <div style={{
+      height: '100vh',
+      width: '100vw',
+      backgroundColor: '#111',
+      color: 'white',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'sans-serif'
+    }}>
+      <h2>Sign Up</h2>
+      <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          style={{ margin: '0.5rem 0', padding: '0.75rem', width: '250px' }}
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          style={{ margin: '0.5rem 0', padding: '0.75rem', width: '250px' }}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          style={{ marginBottom: '1rem', padding: '0.75rem', width: '250px' }}
+        />
+
+        <label style={{ marginBottom: '1rem' }}>
+          <input
+            type="checkbox"
+            checked={xpEnabled}
+            onChange={(e) => setXpEnabled(e.target.checked)}
+            style={{ marginRight: '0.5rem' }}
+          />
+          Enable XP Tracking
+        </label>
+
+        <button type="submit" style={{ padding: '0.75rem 1.5rem', marginBottom: '0.5rem' }}>
+          Register
+        </button>
+        <button
+          type="button"
+          onClick={onSwitchToLogin}
+          style={{ padding: '0.5rem 1rem', backgroundColor: 'transparent', color: '#ccc', border: 'none' }}
+        >
+          Already have an account? Log In
+        </button>
+      </form>
+    </div>
+  );
+}
 
 
 function MainApp({ user }) {
-  
+
+const [showSettings, setShowSettings] = useState(false);
+
+const [allUsers, setAllUsers] = useState([]);
 
   const [endDate, setEndDate] = useState(() => {
   const today = new Date();
@@ -170,6 +270,9 @@ const [currentJournalData, setCurrentJournalData] = useState({
   value: ''
 });
 
+
+
+
 const auth = getAuth();
 const loadHabits = async () => {
   if (!user) return;
@@ -183,6 +286,23 @@ const loadHabits = async () => {
   }
 };
 
+
+const loadAllUsers = async () => {
+  try {
+    const snapshot = await getDocs(collection(db, 'profiles'));
+    const users = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setAllUsers(users);
+  } catch (err) {
+    console.error('Failed to load users:', err);
+  }
+};
+
+
+
+
 useEffect(() => {
   if (!user) return;
 
@@ -193,15 +313,34 @@ useEffect(() => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setProfile({
-          xp: data.xp || 0,
-          level: data.level || 0,
-          xpEnabled: data.xpEnabled !== false // default to true if not set
-        });
-      } else {
-        // Set a new profile if it doesn't exist
-        await setDoc(userRef, { xp: 0, level: 0, xpEnabled: true });
-        setProfile({ xp: 0, level: 0, xpEnabled: true });
-      }
+  xp: data.xp || 0,
+  level: data.level || 0,
+  xpEnabled: data.xpEnabled !== false,
+  isAdmin: data.isAdmin === true,
+  email: data.email || user.email
+});
+
+
+
+      }else {
+  await setDoc(userRef, {
+    xp: 0,
+    level: 0,
+    xpEnabled: true,
+    isAdmin: false,
+    email: user.email
+  });
+
+  setProfile({
+    xp: 0,
+    level: 0,
+    xpEnabled: true,
+    isAdmin: false,
+    email: user.email
+  });
+}
+
+
     } catch (err) {
       console.error('Failed to load profile:', err);
     }
@@ -508,6 +647,22 @@ const handleDelete = async (id) => {
   >
     Log Out
   </button>
+  <button
+  onClick={() => setShowSettings(true)}
+  style={{
+    marginTop: '0.5rem',
+    padding: '0.25rem 0.5rem',
+    backgroundColor: '#666',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    marginLeft: '0.5rem'
+  }}
+>
+  Profile
+</button>
+
 </div>
 
     </div>
@@ -1117,6 +1272,38 @@ const handleDelete = async (id) => {
   </div>
   
 )}
+
+{profile.isAdmin && (
+  <div style={{ marginTop: '2rem', padding: '1rem', borderTop: '2px solid #555' }}>
+    <h2>Admin Panel</h2>
+    <button
+      onClick={loadAllUsers}
+      style={{
+        padding: '0.5rem 1rem',
+        backgroundColor: '#444',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        marginBottom: '1rem'
+      }}
+    >
+      Load All Users
+    </button>
+
+    <ul>
+      {allUsers.map(u => (
+        <li key={u.id} style={{ marginBottom: '0.5rem' }}>
+          <strong>{u.username}</strong><br />
+          Email: {u.email || '(no email saved)'}<br />
+          Level: {u.level} | XP: {u.xp}<br />
+          Admin: {u.isAdmin ? '✅' : '❌'}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
+
 <footer
   style={{
     marginTop: '2rem',
