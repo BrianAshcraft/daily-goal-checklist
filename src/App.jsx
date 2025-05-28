@@ -6,6 +6,8 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, on
 import { setDoc, doc, updateDoc } from 'firebase/firestore';
 import { getDoc } from 'firebase/firestore';
 import { deleteDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+
 
 
 import {
@@ -50,10 +52,6 @@ function AppRouter() {
     </Router>
   );
 }
-
-
-
-  import { useNavigate } from 'react-router-dom';
 
 function LoginScreen() {
   const auth = getAuth();
@@ -331,7 +329,8 @@ function RegisterScreen() {
 
 function MainApp({ user }) {
 
-const [showSettings, setShowSettings] = useState(false);
+  
+const navigate = useNavigate();
 
 const [allUsers, setAllUsers] = useState([]);
 
@@ -748,7 +747,7 @@ const handleDelete = async (id) => {
     Log Out
   </button>
   <button
-  onClick={() => setShowSettings(true)}
+  onClick={() => navigate('/profile')}
   style={{
     marginTop: '0.5rem',
     padding: '0.25rem 0.5rem',
@@ -762,6 +761,7 @@ const handleDelete = async (id) => {
 >
   Profile
 </button>
+
 
 </div>
 
