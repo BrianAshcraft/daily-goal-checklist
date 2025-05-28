@@ -8,9 +8,27 @@ import { getDoc } from 'firebase/firestore';
 import { deleteDoc } from 'firebase/firestore';
 
 
-function App() {
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate
+} from 'react-router-dom';
+
+function ProfileScreen({ user }) {
+  return (
+    <div style={{ padding: '2rem', color: 'white' }}>
+      <h2>Profile Page</h2>
+      <p>Email: {user?.email}</p>
+      <p>User ID: {user?.uid}</p>
+    </div>
+  );
+}
+
+
+
+function AppRouter() {
   const [user, setUser] = useState(null);
-  const [showRegister, setShowRegister] = useState(false); // new
   const auth = getAuth();
 
   useEffect(() => {
@@ -20,23 +38,31 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  if (user) {
-    return <MainApp user={user} />;
-  }
-
-  // decide what screen to show based on toggle
-  return showRegister
-    ? <RegisterScreen onSwitchToLogin={() => setShowRegister(false)} />
-    : <LoginScreen onSwitchToRegister={() => setShowRegister(true)} />;
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={user ? <MainApp user={user} /> : <Navigate to="/login" />} />
+        <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" />} />
+        <Route path="/register" element={!user ? <RegisterScreen /> : <Navigate to="/" />} />
+        <Route path="/profile" element={user ? <ProfileScreen user={user} /> : <Navigate to="/login" />} />
+        <Route path="*" element={<div style={{ color: 'white' }}>Page not found</div>} />
+      </Routes>
+    </Router>
+  );
 }
 
-  function LoginScreen({ onSwitchToRegister }) {
+
+
+  import { useNavigate } from 'react-router-dom';
+
+function LoginScreen() {
   const auth = getAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
-    e.preventDefault(); // prevent page reload
+    e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
@@ -45,64 +71,94 @@ function App() {
   };
 
   return (
-    <div
-      style={{
-        height: '100vh',
-        width: '100vw',
-        backgroundColor: '#111',
-        color: 'white',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'sans-serif'
-      }}
-    >
-      <h2>Everything Tracker</h2>
-      <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+      width: '100vw',
+      backgroundColor: '#0e0e0e',
+      margin: 0,
+      padding: 0
+    }}>
+      <form
+        onSubmit={handleLogin}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          backgroundColor: 'transparent',
+          padding: '2rem',
+          textAlign: 'center',
+          width: '300px'
+        }}
+      >
+        <h2 style={{ color: 'white', marginBottom: '1rem' }}>Everything Tracker</h2>
+
         <input
           type="email"
           placeholder="Email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={e => setEmail(e.target.value)}
           style={{
-            margin: '0.5rem 0',
             padding: '0.75rem',
-            width: '250px',
             borderRadius: '6px',
-            border: '1px solid #ccc'
+            border: '1px solid #888',
+            backgroundColor: 'transparent',
+            color: 'white'
           }}
         />
         <input
           type="password"
           placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={e => setPassword(e.target.value)}
           style={{
-            marginBottom: '1rem',
             padding: '0.75rem',
-            width: '250px',
             borderRadius: '6px',
-            border: '1px solid #ccc'
+            border: '1px solid #888',
+            backgroundColor: 'transparent',
+            color: 'white'
           }}
         />
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button type="submit" style={{ padding: '0.75rem 1.5rem' }}>
+
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+          <button
+            type="submit"
+            style={{
+              backgroundColor: '#1a1a1a',
+              color: 'white',
+              padding: '0.5rem 1rem',
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
             Log In
           </button>
-                <button
-        type="button"
-        onClick={onSwitchToRegister}
-        style={{ padding: '0.75rem 1.5rem' }}
-      >
-        Sign Up
-      </button>
-
+          <button
+            type="button"
+            onClick={() => navigate('/register')}
+            style={{
+              backgroundColor: '#1a1a1a',
+              color: 'white',
+              padding: '0.5rem 1rem',
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            Sign Up
+          </button>
         </div>
       </form>
     </div>
   );
 }
+
+
+
+
 
 function NumericInputCell({ habit, date, xp, onSave }) {
   const initial = habit.values?.[date] || '';
@@ -136,20 +192,19 @@ function NumericInputCell({ habit, date, xp, onSave }) {
   );
 }
 
-function RegisterScreen({ onSwitchToLogin }) {
+function RegisterScreen() {
   const auth = getAuth();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [xpEnabled, setXpEnabled] = useState(true); // default is ON
+  const [xpEnabled, setXpEnabled] = useState(true);
+  const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
-
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
       await setDoc(doc(db, 'profiles', user.uid), {
         username,
         email,
@@ -158,7 +213,6 @@ function RegisterScreen({ onSwitchToLogin }) {
         xpEnabled,
         isAdmin: false
       });
-
     } catch (err) {
       console.error('Registration failed:', err);
     }
@@ -166,60 +220,104 @@ function RegisterScreen({ onSwitchToLogin }) {
 
   return (
     <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
       height: '100vh',
       width: '100vw',
-      backgroundColor: '#111',
-      color: 'white',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: 'sans-serif'
+      backgroundColor: '#0e0e0e'
     }}>
-      <h2>Sign Up</h2>
-      <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <form
+        onSubmit={handleRegister}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          backgroundColor: 'transparent',
+          padding: '2rem',
+          textAlign: 'center',
+          width: '300px'
+        }}
+      >
+        <h2 style={{ color: 'white', marginBottom: '1rem' }}>Sign Up</h2>
+
         <input
           type="text"
           placeholder="Username"
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-          style={{ margin: '0.5rem 0', padding: '0.75rem', width: '250px' }}
+          onChange={e => setUsername(e.target.value)}
+          style={{
+            padding: '0.75rem',
+            borderRadius: '6px',
+            border: '1px solid #888',
+            backgroundColor: 'transparent',
+            color: 'white'
+          }}
         />
+
         <input
           type="email"
           placeholder="Email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={{ margin: '0.5rem 0', padding: '0.75rem', width: '250px' }}
+          onChange={e => setEmail(e.target.value)}
+          style={{
+            padding: '0.75rem',
+            borderRadius: '6px',
+            border: '1px solid #888',
+            backgroundColor: 'transparent',
+            color: 'white'
+          }}
         />
+
         <input
           type="password"
           placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={{ marginBottom: '1rem', padding: '0.75rem', width: '250px' }}
+          onChange={e => setPassword(e.target.value)}
+          style={{
+            padding: '0.75rem',
+            borderRadius: '6px',
+            border: '1px solid #888',
+            backgroundColor: 'transparent',
+            color: 'white'
+          }}
         />
 
-        <label style={{ marginBottom: '1rem' }}>
+        <label style={{ color: 'white', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
           <input
             type="checkbox"
             checked={xpEnabled}
-            onChange={(e) => setXpEnabled(e.target.checked)}
-            style={{ marginRight: '0.5rem' }}
+            onChange={e => setXpEnabled(e.target.checked)}
           />
           Enable XP Tracking
         </label>
 
-        <button type="submit" style={{ padding: '0.75rem 1.5rem', marginBottom: '0.5rem' }}>
+        <button
+          type="submit"
+          style={{
+            backgroundColor: '#1a1a1a',
+            color: 'white',
+            padding: '0.5rem 1rem',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+        >
           Register
         </button>
+
         <button
           type="button"
-          onClick={onSwitchToLogin}
-          style={{ padding: '0.5rem 1rem', backgroundColor: 'transparent', color: '#ccc', border: 'none' }}
+          onClick={() => navigate('/login')}
+          style={{
+            backgroundColor: 'transparent',
+            color: 'white',
+            textDecoration: 'underline',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            marginTop: '0.5rem'
+          }}
         >
           Already have an account? Log In
         </button>
@@ -227,6 +325,8 @@ function RegisterScreen({ onSwitchToLogin }) {
     </div>
   );
 }
+
+
 
 
 function MainApp({ user }) {
@@ -1321,4 +1421,4 @@ const handleDelete = async (id) => {
   );
 
 }
-export default App;
+export default AppRouter;
