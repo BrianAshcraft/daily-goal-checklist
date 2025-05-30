@@ -7,9 +7,6 @@ import { setDoc, doc, updateDoc } from 'firebase/firestore';
 import { getDoc } from 'firebase/firestore';
 import { deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-
-
-
 import {
   BrowserRouter as Router,
   Routes,
@@ -27,26 +24,65 @@ function ProfileScreen({ user }) {
   );
 }
 
-
-
 function AppRouter() {
   const [user, setUser] = useState(null);
-  const auth = getAuth();
+  const [profile, setProfile] = useState({
+    xp: 0,
+    level: 0,
+    xpEnabled: true,
+    isAdmin: false,
+    email: ''
+  });
 
+  const auth = getAuth();
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-    });
-    return () => unsubscribe();
-  }, []);
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    setUser(user);
+
+    if (user) {
+      const userRef = doc(db, 'profiles', user.uid);
+      const snapshot = await getDoc(userRef);
+
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setProfile({
+          xp: data.xp || 0,
+          level: data.level || 0,
+          xpEnabled: data.xpEnabled !== false,
+          isAdmin: data.isAdmin === true,
+          email: data.email || user.email
+        });
+      } else {
+        await setDoc(userRef, {
+          xp: 0,
+          level: 0,
+          xpEnabled: true,
+          isAdmin: false,
+          email: user.email
+        });
+
+        setProfile({
+          xp: 0,
+          level: 0,
+          xpEnabled: true,
+          isAdmin: false,
+          email: user.email
+        });
+      }
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
 
   return (
     <Router>
       <Routes>
-        <Route path="/" element={user ? <MainApp user={user} /> : <Navigate to="/login" />} />
+        <Route path="/" element={user ? <MainApp user={user} profile={profile} /> : <Navigate to="/login" />} />
         <Route path="/login" element={!user ? <LoginScreen /> : <Navigate to="/" />} />
         <Route path="/register" element={!user ? <RegisterScreen /> : <Navigate to="/" />} />
-        <Route path="/profile" element={user ? <ProfileScreen user={user} /> : <Navigate to="/login" />} />
+        <Route path="/profile" element={user ? <ProfileScreen user={user} profile={profile} /> : <Navigate to="/login" />} />
+
         <Route path="*" element={<div style={{ color: 'white' }}>Page not found</div>} />
       </Routes>
     </Router>
@@ -327,9 +363,9 @@ function RegisterScreen() {
 
 
 
-function MainApp({ user }) {
+function MainApp({ user, profile }) {
 
-  
+
 const navigate = useNavigate();
 
 const [allUsers, setAllUsers] = useState([]);
@@ -347,7 +383,6 @@ const [folders, setFolders] = useState([]);
   const [habitInput, setHabitInput] = useState('');
   const [xpInput, setXpInput] = useState('');
   const [inputType, setInputType] = useState('checkbox');
-  const [profile, setProfile] = useState({ xp: 0, level: 0 });
   const [addingSubTo, setAddingSubTo] = useState(null);
   const [subName, setSubName] = useState('');
   const [subXp, setSubXp] = useState('');
@@ -401,55 +436,6 @@ const loadAllUsers = async () => {
 
 
 
-
-useEffect(() => {
-  if (!user) return;
-
-  const loadProfile = async () => {
-    try {
-      const userRef = doc(db, 'profiles', user.uid);
-      const snapshot = await getDoc(userRef);
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setProfile({
-  xp: data.xp || 0,
-  level: data.level || 0,
-  xpEnabled: data.xpEnabled !== false,
-  isAdmin: data.isAdmin === true,
-  email: data.email || user.email
-});
-
-
-
-      }else {
-  await setDoc(userRef, {
-    xp: 0,
-    level: 0,
-    xpEnabled: true,
-    isAdmin: false,
-    email: user.email
-  });
-
-  setProfile({
-    xp: 0,
-    level: 0,
-    xpEnabled: true,
-    isAdmin: false,
-    email: user.email
-  });
-}
-
-
-    } catch (err) {
-      console.error('Failed to load profile:', err);
-    }
-  };
-
-  loadProfile();
-}, [user]);
-
-
-
 useEffect(() => {
   if (!user) return;
   loadHabits();
@@ -498,33 +484,31 @@ useEffect(() => {
 }, [user]);
 
 
-  const awardXp = (amount) => {
-  if (!profile.xpEnabled) return; // Exit early if XP tracking is off
+const awardXp = async (amount) => {
+  if (!profile.xpEnabled) return;
 
-  setProfile(prev => {
-    let newXp = prev.xp + amount;
-    let newLevel = prev.level;
+  try {
+    let newXp = profile.xp + amount;
+    let newLevel = profile.level;
 
     while (newXp >= getThreshold(newLevel + 1)) {
       newLevel++;
     }
 
     const updatedProfile = {
-      ...prev,               // keep all existing profile fields (like xpEnabled!)
+      ...profile,
       xp: newXp,
-      level: newLevel
+      level: newLevel,
     };
 
-    if (user) {
-      const userRef = doc(db, 'profiles', user.uid);
-      setDoc(userRef, updatedProfile, { merge: true }).catch(err =>
-        console.error('Failed to save profile:', err)
-      );
-    }
-
-    return updatedProfile;
-  });
+    const userRef = doc(db, 'profiles', user.uid);
+    await setDoc(userRef, updatedProfile, { merge: true });
+    // AppRouter will sync the new profile when onAuthStateChanged fires
+  } catch (err) {
+    console.error('Failed to update XP in Firestore:', err);
+  }
 };
+
 
   
   const handleJournalEntry = async (habitId, date, currentValue, xpValue) => {
@@ -721,12 +705,10 @@ const handleDelete = async (id) => {
       checked={profile.xpEnabled}
       onChange={async () => {
   const newValue = !profile.xpEnabled;
-  const updated = { ...profile, xpEnabled: newValue };
-  setProfile(updated);
-
   const userRef = doc(db, 'profiles', user.uid);
-  await updateDoc(userRef, updated);
+  await updateDoc(userRef, { xpEnabled: newValue });
 }}
+
 
     />
     Enable XP Tracking
