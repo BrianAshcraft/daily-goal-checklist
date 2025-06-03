@@ -13,16 +13,45 @@ import {
   Route,
   Navigate
 } from 'react-router-dom';
+function ProfileScreen({ user, profile }) {
+  const [xpEnabled, setXpEnabled] = useState(profile?.xpEnabled ?? true);
 
-function ProfileScreen({ user }) {
+  useEffect(() => {
+    setXpEnabled(profile?.xpEnabled ?? true);
+  }, [profile]);
+
+  const handleToggle = async () => {
+    const newValue = !xpEnabled;
+    setXpEnabled(newValue);
+    const userRef = doc(db, 'profiles', user.uid);
+    try {
+      await updateDoc(userRef, { xpEnabled: newValue });
+    } catch (err) {
+      console.error('Failed to update XP tracking toggle:', err);
+    }
+  };
+
   return (
     <div style={{ padding: '2rem', color: 'white' }}>
       <h2>Profile Page</h2>
-      <p>Email: {user?.email}</p>
-      <p>User ID: {user?.uid}</p>
+      <p><strong>Email:</strong> {user?.email}</p>
+      <p><strong>User ID:</strong> {user?.uid}</p>
+      <p><strong>Level:</strong> {profile?.level ?? 0}</p>
+      <p><strong>XP:</strong> {profile?.xp ?? 0}</p>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+        <input type="checkbox" checked={xpEnabled} onChange={handleToggle} />
+        Enable XP Tracking
+      </label>
+
+      <p style={{ marginTop: '1rem' }}>
+        <strong>Admin:</strong> {profile?.isAdmin ? 'Yes' : 'No'}
+      </p>
     </div>
   );
 }
+
+
 
 function AppRouter() {
   const [user, setUser] = useState(null);
@@ -699,20 +728,7 @@ const handleDelete = async (id) => {
     </>
   )}
 
-  <label style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.85rem' }}>
-    <input
-      type="checkbox"
-      checked={profile.xpEnabled}
-      onChange={async () => {
-  const newValue = !profile.xpEnabled;
-  const userRef = doc(db, 'profiles', user.uid);
-  await updateDoc(userRef, { xpEnabled: newValue });
-}}
-
-
-    />
-    Enable XP Tracking
-  </label>
+  
 
   <button
     onClick={() => signOut(auth)}
