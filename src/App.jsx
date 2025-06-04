@@ -16,6 +16,23 @@ import {
 function ProfileScreen({ user, profile }) {
   const [xpEnabled, setXpEnabled] = useState(profile?.xpEnabled ?? true);
 
+const [allUsers, setAllUsers] = useState([]);
+
+const loadAllUsers = async () => {
+  try {
+    const snapshot = await getDocs(collection(db, 'profiles'));
+    const users = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setAllUsers(users);
+  } catch (err) {
+    console.error('Failed to load users:', err);
+  }
+};
+
+
+
   useEffect(() => {
     setXpEnabled(profile?.xpEnabled ?? true);
   }, [profile]);
@@ -47,6 +64,38 @@ function ProfileScreen({ user, profile }) {
       <p style={{ marginTop: '1rem' }}>
         <strong>Admin:</strong> {profile?.isAdmin ? 'Yes' : 'No'}
       </p>
+
+{profile.isAdmin && (
+  <div style={{ marginTop: '2rem', padding: '1rem', borderTop: '2px solid #555' }}>
+    <h2>Admin Panel</h2>
+    <button
+      onClick={loadAllUsers}
+      style={{
+        padding: '0.5rem 1rem',
+        backgroundColor: '#444',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        marginBottom: '1rem'
+      }}
+    >
+      Load All Users
+    </button>
+
+    <ul>
+      {allUsers.map(u => (
+        <li key={u.id} style={{ marginBottom: '0.5rem' }}>
+          <strong>{u.username}</strong><br />
+          Email: {u.email || '(no email saved)'}<br />
+          Level: {u.level} | XP: {u.xp}<br />
+          Admin: {u.isAdmin ? '✅' : '❌'}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
+
     </div>
   );
 }
@@ -450,18 +499,7 @@ const loadHabits = async () => {
 };
 
 
-const loadAllUsers = async () => {
-  try {
-    const snapshot = await getDocs(collection(db, 'profiles'));
-    const users = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    setAllUsers(users);
-  } catch (err) {
-    console.error('Failed to load users:', err);
-  }
-};
+
 
 
 
@@ -1371,35 +1409,6 @@ const handleDelete = async (id) => {
   
 )}
 
-{profile.isAdmin && (
-  <div style={{ marginTop: '2rem', padding: '1rem', borderTop: '2px solid #555' }}>
-    <h2>Admin Panel</h2>
-    <button
-      onClick={loadAllUsers}
-      style={{
-        padding: '0.5rem 1rem',
-        backgroundColor: '#444',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        marginBottom: '1rem'
-      }}
-    >
-      Load All Users
-    </button>
-
-    <ul>
-      {allUsers.map(u => (
-        <li key={u.id} style={{ marginBottom: '0.5rem' }}>
-          <strong>{u.username}</strong><br />
-          Email: {u.email || '(no email saved)'}<br />
-          Level: {u.level} | XP: {u.xp}<br />
-          Admin: {u.isAdmin ? '✅' : '❌'}
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
 
 
 <footer
