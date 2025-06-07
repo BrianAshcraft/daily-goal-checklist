@@ -1091,78 +1091,9 @@ const handleDelete = async (id) => {
               <tr style={{ borderBottom: '1px solid #111' }}>
 
                 <td style={{ padding: '0.5rem' }}>
-  {renamingHabitId === h.id ? (
-    <div style={{ display: 'flex', gap: '0.25rem' }}>
-      <input
-        type="text"
-        value={renamingHabitName}
-        onChange={e => setRenamingHabitName(e.target.value)}
-        style={{ width: '70%' }}
-      />
-      <button
-        onClick={async () => {
-          try {
-            const habitRef = doc(db, 'habits', h.id);
-            await updateDoc(habitRef, { name: renamingHabitName });
-            const q = query(collection(db, 'habits'), where('userId', '==', user.uid));
-            const snapshot = await getDocs(q);
-            const loadedHabits = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-            setHabits(loadedHabits);
-            setRenamingHabitId(null);
-            setRenamingHabitName('');
-          } catch (err) {
-            console.error('Failed to save habit name:', err);
-          }
-        }}
-      >
-        Save
-      </button>
-      <button onClick={() => {
-        setRenamingHabitId(null);
-        setRenamingHabitName('');
-      }}>
-        Cancel
-      </button>
-    </div>
-  ) : (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span>{h.name}</span>
-      <button
-  onClick={() => {
-    setRenamingHabitId(h.id);
-    setRenamingHabitName(h.name);
-  }}
-  style={{
-    marginLeft: '0.5rem',
-    background: 'none',
-    border: 'none',
-    padding: 0,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-  }}
-  title="Edit"
-  aria-label="Edit"
->
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{ display: 'block' }}
-  >
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-  </svg>
-</button>
-    </div>
-  )}
+  {h.name}
 </td>
+
                 <td style={{ textAlign: 'center' }}>{h.xpValue}</td>
                 {visibleDates.map(date => (
                   <td key={date} style={{ textAlign: 'center' }}>
@@ -1286,7 +1217,37 @@ const handleDelete = async (id) => {
       </button>
     </div>
   ) : (
-    <button onClick={() => setEditingHabitId(h.id)}>Edit</button>
+    <button
+  onClick={() => setEditingHabitId(h.id)}
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.25rem 0.5rem',
+    backgroundColor: '#333',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer'
+  }}
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+  </svg>
+  Edit
+</button>
+
   )}
 </td>
               </tr>
