@@ -17,6 +17,7 @@ function ProfileScreen({ user, profile }) {
   const [xpEnabled, setXpEnabled] = useState(profile?.xpEnabled ?? true);
 
 const [allUsers, setAllUsers] = useState([]);
+const [showUserList, setShowUserList] = useState(false);
 
 const loadAllUsers = async () => {
   try {
@@ -68,30 +69,39 @@ const loadAllUsers = async () => {
 {profile.isAdmin && (
   <div style={{ marginTop: '2rem', padding: '1rem', borderTop: '2px solid #555' }}>
     <h2>Admin Panel</h2>
-    <button
-      onClick={loadAllUsers}
-      style={{
-        padding: '0.5rem 1rem',
-        backgroundColor: '#444',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        marginBottom: '1rem'
-      }}
-    >
-      Load All Users
-    </button>
+<button
+  onClick={async () => {
+    if (!showUserList) {
+      await loadAllUsers();
+    }
+    setShowUserList(!showUserList);
+  }}
+  style={{
+    padding: '0.5rem 1rem',
+    backgroundColor: '#444',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    marginBottom: '1rem'
+  }}
+>
+  {showUserList ? 'Hide User List' : 'Load All Users'}
+</button>
 
-    <ul>
-      {allUsers.map(u => (
-        <li key={u.id} style={{ marginBottom: '0.5rem' }}>
-          <strong>{u.username}</strong><br />
-          Email: {u.email || '(no email saved)'}<br />
-          Level: {u.level} | XP: {u.xp}<br />
-          Admin: {u.isAdmin ? '✅' : '❌'}
-        </li>
-      ))}
-    </ul>
+
+    {showUserList && (
+  <ul>
+    {allUsers.map(u => (
+      <li key={u.id} style={{ marginBottom: '0.5rem' }}>
+        <strong>{u.username}</strong><br />
+        Email: {u.email || '(no email saved)'}<br />
+        Level: {u.level} | XP: {u.xp}<br />
+        Admin: {u.isAdmin ? '✅' : '❌'}
+      </li>
+    ))}
+  </ul>
+)}
+
   </div>
 )}
 
